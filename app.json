@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Goa Rail Map",
+    "slug": "goaRailWay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Goa Rail Map to use your location to find nearby stations."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.goarailway.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow Goa Rail Map to use your location to find nearby stations.",
+        "NSLocationAlwaysUsageDescription": "Allow Goa Rail Map to use your location to find nearby stations."
+      }
+    },
+    "android": {
+      "package": "com.goarailway.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#1A73E8"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
