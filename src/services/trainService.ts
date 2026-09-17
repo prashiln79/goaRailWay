@@ -1,8 +1,8 @@
 import { Train } from '../types/Train';
 import { TRAINS, TRAIN_MAP } from '../data/trains';
 import { GOA_STATION_CODES, MUMBAI_STATION_CODES } from '../data/stations';
-import { AvailabilityItem, ConnectionOption } from '../types/Connection';
-import { MOCK_AVAILABILITY, MOCK_CONNECTIONS } from '../data/connections';
+import { ConnectionOption } from '../types/Connection';
+import { MOCK_CONNECTIONS } from '../data/connections';
 
 export interface ITrainService {
   getAllTrains(): Promise<Train[]>;
@@ -12,7 +12,6 @@ export interface ITrainService {
   getTrainsFromMumbai(): Promise<Train[]>;
   getTrainsAtGoaStations(): Promise<Train[]>;
   searchTrains(query: string): Promise<Train[]>;
-  getTrainAvailability(trainNumber: string, date?: string): Promise<AvailabilityItem[]>;
   getConnections(fromCode: string, toCode: string, date?: string): Promise<ConnectionOption[]>;
 }
 
@@ -58,14 +57,9 @@ class MockTrainService implements ITrainService {
     );
   }
 
-  async getTrainAvailability(trainNumber: string, _date?: string): Promise<AvailabilityItem[]> {
-    return Promise.resolve(MOCK_AVAILABILITY[trainNumber] ?? MOCK_AVAILABILITY.default);
-  }
-
   async getConnections(_fromCode: string, _toCode: string, _date?: string): Promise<ConnectionOption[]> {
     return Promise.resolve(MOCK_CONNECTIONS);
   }
 }
 
 export const trainService: ITrainService = new MockTrainService();
-

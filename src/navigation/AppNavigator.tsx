@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import TrainsHomeScreen from '../screens/TrainsHomeScreen';
 import TrainDetailsScreen from '../screens/TrainDetailsScreen';
-import AvailabilityScreen from '../screens/AvailabilityScreen';
 import ConnectionsScreen from '../screens/ConnectionsScreen';
 import StationsListScreen from '../screens/StationsListScreen';
 import StationDetailsScreen from '../screens/StationDetailsScreen';
@@ -17,7 +16,6 @@ import MoreScreen from '../screens/MoreScreen';
 export type RootStackParamList = {
   MainTabs: undefined;
   TrainDetails: { trainNumber: string };
-  Availability: { trainNumber: string; fromCode?: string; toCode?: string; date?: string };
   StationDetails: { stationCode: string };
   Connections: undefined;
 };
@@ -58,7 +56,7 @@ function BottomTabs() {
           const icons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
             Trains: { active: 'train', inactive: 'train-outline' },
             Stations: { active: 'location', inactive: 'location-outline' },
-            Saved: { active: 'bookmark', inactive: 'bookmark-outline' },
+            Saved: { active: 'heart', inactive: 'heart-outline' },
             More: { active: 'ellipsis-horizontal', inactive: 'ellipsis-horizontal-outline' },
           };
           const iconConfig = icons[route.name] ?? { active: 'ellipsis-horizontal', inactive: 'ellipsis-horizontal-outline' };
@@ -104,11 +102,6 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name="TrainDetails"
           component={TrainDetailsScreen}
-          options={{ presentation: 'card', gestureEnabled: true }}
-        />
-        <Stack.Screen
-          name="Availability"
-          component={AvailabilityScreen}
           options={{ presentation: 'card', gestureEnabled: true }}
         />
         <Stack.Screen

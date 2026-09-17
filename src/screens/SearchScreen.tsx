@@ -187,7 +187,7 @@ const SearchScreen: React.FC = () => {
           data={results}
           keyExtractor={(item, idx) =>
             item.type === 'train'
-              ? `train-${item.train?.id}`
+              ? `train-${item.train?.id}-${idx}`
               : `station-${item.station?.id}-${idx}`
           }
           renderItem={renderResult}

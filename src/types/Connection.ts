@@ -1,10 +1,3 @@
-export interface AvailabilityItem {
-  trainClass: '1A' | '2A' | '3A' | 'SL' | 'CC' | '2S';
-  generalStatus: string; // e.g., 'WL 12', 'Available', 'RAC 8'
-  tatkalStatus: string;  // e.g., 'WL 4', 'RAC 8', 'Available'
-  statusSummary: 'High demand' | 'Available' | 'Try Tatkal' | 'Good chance' | 'Regret';
-}
-
 export interface ConnectionSegment {
   trainNumber: string;
   trainName: string;
@@ -15,13 +8,12 @@ export interface ConnectionSegment {
   arrivalTime: string;
   dayOffset: number;
   duration: string;
-  availabilitySample?: string;
 }
 
 export interface ConnectionOption {
   id: string;
   type: 'direct' | 'connecting';
-  tag?: string; // 'Best Option', 'Often better chances in Tatkal', etc.
+  tag?: string;
   fromStationCode: string;
   toStationCode: string;
   totalDuration: string;

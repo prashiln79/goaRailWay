@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 type TrainDetailsRouteProp = RouteProp<RootStackParamList, 'TrainDetails'>;
 type TrainDetailsNavProp = StackNavigationProp<RootStackParamList>;
 
-type TabOption = 'Overview' | 'Schedule' | 'Stops' | 'Availability';
+type TabOption = 'Overview' | 'Schedule' | 'Stops';
 
 export const TrainDetailsScreen: React.FC = () => {
   const route = useRoute<TrainDetailsRouteProp>();
@@ -43,9 +44,6 @@ export const TrainDetailsScreen: React.FC = () => {
     });
   }, [trainNumber]);
 
-  const handleCheckAvailability = useCallback(() => {
-    navigation.navigate('Availability', { trainNumber });
-  }, [navigation, trainNumber]);
 
   if (loading || !train) {
     return (
@@ -195,19 +193,13 @@ export const TrainDetailsScreen: React.FC = () => {
 
             {/* Tabs Row */}
             <View style={styles.tabsRow}>
-              {(['Overview', 'Schedule', 'Stops', 'Availability'] as TabOption[]).map(tab => {
+              {(['Overview', 'Schedule', 'Stops'] as TabOption[]).map(tab => {
                 const isActive = activeTab === tab;
                 return (
                   <TouchableOpacity
                     key={tab}
                     style={[styles.tabItem, isActive && styles.tabItemActive]}
-                    onPress={() => {
-                      if (tab === 'Availability') {
-                        handleCheckAvailability();
-                      } else {
-                        setActiveTab(tab);
-                      }
-                    }}
+                    onPress={() => setActiveTab(tab)}
                   >
                     <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
                       {tab}
@@ -236,11 +228,11 @@ export const TrainDetailsScreen: React.FC = () => {
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 14) }]}>
         <TouchableOpacity
           style={styles.ctaButton}
-          onPress={handleCheckAvailability}
+          onPress={() => Linking.openURL('https://www.irctc.co.in/nget/train-search').catch(() => {})}
           activeOpacity={0.88}
         >
-          <Text style={styles.ctaButtonText}>Check Availability</Text>
-          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          <Text style={styles.ctaButtonText}>Book on IRCTC</Text>
+          <Ionicons name="open-outline" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

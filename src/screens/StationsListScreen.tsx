@@ -22,10 +22,13 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 type StationsNavProp = StackNavigationProp<RootStackParamList>;
 
+type StationTabFilter = 'ALL' | 'GOA' | 'NEARBY';
+
 export const StationsListScreen: React.FC = () => {
   const navigation = useNavigation<StationsNavProp>();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<StationTabFilter>('ALL');
 
   const q = query.toLowerCase().trim();
 
@@ -84,12 +87,39 @@ export const StationsListScreen: React.FC = () => {
         />
       </View>
 
+      {/* Quick Category Chips: All | Goa Stations | Nearby Alternatives */}
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {(
+            [
+              { id: 'ALL', label: `All (${filteredGoa.length + filteredNearby.length})` },
+              { id: 'GOA', label: `Goa (${filteredGoa.length})` },
+              { id: 'NEARBY', label: `Nearby Alt (${filteredNearby.length})` },
+            ] as { id: StationTabFilter; label: string }[]
+          ).map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => setActiveTab(tab.id)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
       >
         {/* GOA STATIONS SECTION */}
-        {filteredGoa.length > 0 && (
+        {activeTab !== 'NEARBY' && filteredGoa.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>GOA</Text>
 
@@ -113,7 +143,7 @@ export const StationsListScreen: React.FC = () => {
         )}
 
         {/* NEARBY STATIONS SECTION */}
-        {filteredNearby.length > 0 && (
+        {activeTab !== 'GOA' && filteredNearby.length > 0 && (
           <View style={[styles.section, styles.nearbySection]}>
             {/* <Text style={styles.sectionTitle}>NEARBY STATIONS</Text>
             <Text style={styles.sectionSubtitle}>Alternative stations outside Goa</Text> */}
@@ -227,6 +257,34 @@ const styles = StyleSheet.create({
     borderColor: '#EFEAE6',
     marginTop: 10,
     marginBottom: 8,
+  },
+  filterRow: {
+    marginBottom: 8,
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+  },
+  filterChipActive: {
+    backgroundColor: '#9E3C1B',
+    borderColor: '#9E3C1B',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#5C4E46',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   input: {
     flex: 1,

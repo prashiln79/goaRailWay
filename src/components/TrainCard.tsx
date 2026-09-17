@@ -17,100 +17,152 @@ export function getTrainTypeColor(type: string): string {
   return colors[type] ?? '#9E3C1B';
 }
 
+// ── Segment type used by home-screen explorer ──────────────────────────────
+export interface TrainCardSegment {
+  fromCode: string;
+  fromName: string;
+  fromTime: string;
+  fromDay: number;
+  toCode: string;
+  toName: string;
+  toTime: string;
+  toDay: number;
+  direction: '→ Goa' | '→ Mumbai' | 'Halt';
+  directionColor: string;
+  directionBg: string;
+}
+
 interface TrainCardProps {
   train: Train;
-  isSelected?: boolean;
   onPress: (train: Train) => void;
+
+  // ── Journey search context (optional) ──
+  isSelected?: boolean;
   selectedFrom?: string;
   selectedTo?: string;
-  // Destination metadata: Goa station vs Alternative station
-  destinationType?: 'GOA' | 'NEARBY';
-  distanceLabel?: string;     // e.g. "38 km from North Goa" or "60 km from Thivim"
-  alternativeFor?: string;    // e.g. "Alternative for North Goa"
-  roadTravelTip?: string;     // e.g. "Continue to North Goa by road"
   computedDuration?: string;
+  destinationType?: 'GOA' | 'NEARBY';
+  distanceLabel?: string;
+  alternativeFor?: string;
+  roadTravelTip?: string;
+
+  // ── Home explorer context (optional) ──
+  // When provided, shows the contextual segment banner instead of timing row
+  segment?: TrainCardSegment | null;
+  // When true, shows "→ Goa notice" or "Terminates at SWV" notice on All-trains view
+  showGoaNotice?: boolean;
+  showAltNotice?: boolean;
 }
 
 export const TrainCard: React.FC<TrainCardProps> = memo(({
   train,
-  isSelected,
   onPress,
+  isSelected,
   selectedFrom,
   selectedTo,
+  computedDuration,
   destinationType = 'GOA',
   distanceLabel,
   alternativeFor,
   roadTravelTip,
-  computedDuration,
+  segment,
+  showGoaNotice,
+  showAltNotice,
 }) => {
-  // Find matching stops for timing
+  // ── Find stops for timing ─────────────────────────────────────────────────
   const fromStop = train.stops.find(s => s.stationCode === selectedFrom) ?? train.stops[0];
   const toStop = train.stops.find(s => s.stationCode === selectedTo) ?? train.stops[train.stops.length - 1];
 
-  const depTime = fromStop?.departureTime ?? '15:20';
-  const arrTime = toStop?.arrivalTime ?? toStop?.departureTime ?? '03:20';
-  const dayOffset = (toStop?.dayOffset ?? 0) - (fromStop?.dayOffset ?? 0);
+  const defaultDepTime = fromStop?.departureTime ?? '00:00';
+  const defaultArrTime = toStop?.arrivalTime ?? toStop?.departureTime ?? '00:00';
+  const defaultDayOffset = (toStop?.dayOffset ?? 0) - (fromStop?.dayOffset ?? 0);
 
-  const fromName = (selectedFrom && STATION_MAP[selectedFrom]?.name) || STATION_MAP[train.sourceStationCode]?.name || train.sourceStationCode;
-  const toName = (selectedTo && STATION_MAP[selectedTo]?.name) || STATION_MAP[train.destinationStationCode]?.name || train.destinationStationCode;
+  const defaultFromName = (selectedFrom && STATION_MAP[selectedFrom]?.name)
+    || STATION_MAP[train.sourceStationCode]?.name
+    || train.sourceStationCode;
+  const defaultToName = (selectedTo && STATION_MAP[selectedTo]?.name)
+    || STATION_MAP[train.destinationStationCode]?.name
+    || train.destinationStationCode;
 
-  // Calculate Goa stops count
+  // Active segment values (if a directional segment is present, e.g. for Goa / Mumbai)
+  const isDirectionalSegment = !!(
+    segment &&
+    segment.direction !== 'Halt' &&
+    segment.fromCode !== segment.toCode
+  );
+
+  const depTime = isDirectionalSegment ? segment.fromTime : defaultDepTime;
+  const arrTime = isDirectionalSegment ? segment.toTime : defaultArrTime;
+  const fromName = isDirectionalSegment ? segment.fromName : defaultFromName;
+  const toName = isDirectionalSegment ? segment.toName : defaultToName;
+  const dayOffset = isDirectionalSegment
+    ? Math.max(0, (segment.toDay ?? 0) - (segment.fromDay ?? 0))
+    : defaultDayOffset;
+
+  // ── Duration ──────────────────────────────────────────────────────────────
+  const computedDur = computedDuration ?? (() => {
+    const [dh, dm] = depTime.split(':').map(Number);
+    const [ah, am] = arrTime.split(':').map(Number);
+    if (isNaN(dh) || isNaN(dm) || isNaN(ah) || isNaN(am)) return '0h 00m';
+    const depDay = isDirectionalSegment ? (segment?.fromDay ?? 0) : (fromStop?.dayOffset ?? 0);
+    const arrDay = isDirectionalSegment ? (segment?.toDay ?? 0) : (toStop?.dayOffset ?? 0);
+    const depMins = depDay * 1440 + dh * 60 + dm;
+    const arrMins = arrDay * 1440 + ah * 60 + am;
+    let diff = arrMins - depMins;
+    if (diff < 0) diff += 1440;
+    return `${Math.floor(diff / 60)}h ${(diff % 60).toString().padStart(2, '0')}m`;
+  })();
+
+  // ── Journey type ─────────────────────────────────────────────────────────
+  const depHour = parseInt(depTime.split(':')[0] || '12', 10);
+  const arrHour = parseInt(arrTime.split(':')[0] || '12', 10);
+
+  // A train is overnight if it crosses midnight / arrives next day
+  const isOvernight = dayOffset > 0;
+
+  // Daytime is 05:00 to 18:59
+  const isDepDay = depHour >= 5 && depHour < 19;
+  const isArrDay = arrHour >= 5 && arrHour < 19;
+
+  const journeyType = isOvernight
+    ? { label: '🌙 Overnight', bg: '#E8E1F1', text: '#57466F' }
+    : isDepDay && isArrDay
+      ? { label: '☀️ Day', bg: '#FEF3C7', text: '#92400E' }
+      : isDepDay && !isArrDay
+        ? { label: '🌅 Evening', bg: '#FFEDD5', text: '#9A3412' }
+        : { label: '🌙 Night', bg: '#EDE9FE', text: '#5B21B6' };
+
+  // ── Running days ─────────────────────────────────────────────────────────
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const runsText = train.runningDays.length === 7
+    ? 'Runs daily'
+    : train.runningDays.length === 6 && !train.runningDays.includes(0)
+      ? 'Mon – Sat'
+      : train.runningDays.length <= 3
+        ? `Runs: ${train.runningDays.map(d => DAY_NAMES[d]).join(', ')}`
+        : `${train.runningDays.length} days/week`;
+
+  // ── Goa stops count ──────────────────────────────────────────────────────
   const goaStopsCount = train.stops.filter(s =>
     ['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG', 'SVDEM', 'KULEM'].includes(s.stationCode),
   ).length;
 
-  // Running days text formatting
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const getRunsText = () => {
-    if (train.runningDays.length === 7) {
-      return 'Runs daily';
-    }
-    if (train.runningDays.length === 6 && !train.runningDays.includes(0)) {
-      return 'Mon – Sat';
-    }
-    if (train.runningDays.length <= 3) {
-      return train.runningDays.map(d => DAY_NAMES[d]).join(', ');
-    }
-    return `${train.runningDays.length} days/week`;
-  };
-
-  const runsText = getRunsText();
-
-  // Journey Type determination: ☀️ Day, 🌙 Night, Day → Night, Night → Day
-  const getJourneyType = () => {
-    const depHour = parseInt(depTime.split(':')[0] || '12', 10);
-    const arrHour = parseInt(arrTime.split(':')[0] || '12', 10);
-
-    const isDepDay = depHour >= 6 && depHour < 18;
-    const isArrDay = arrHour >= 6 && arrHour < 18;
-
-    if (isDepDay && isArrDay) {
-      return { label: '☀️ Day', bg: '#FEF3C7', text: '#92400E' };
-    }
-    if (!isDepDay && !isArrDay) {
-      return { label: '🌙 Night', bg: '#EDE9FE', text: '#5B21B6' };
-    }
-    if (isDepDay && !isArrDay) {
-      return { label: 'Day → Night', bg: '#FFEDD5', text: '#9A3412' };
-    }
-    return { label: 'Night → Day', bg: '#E0F2FE', text: '#0369A1' };
-  };
-
-  const journeyType = getJourneyType();
-
   const isAlternative = destinationType === 'NEARBY';
+  // Whether we are in the explorer (home) context
+  const isExplorer = segment !== undefined;
 
   return (
     <TouchableOpacity
       style={[
         styles.card,
         isSelected && styles.cardSelected,
-        isAlternative && styles.cardAlternative,
+        isAlternative && !isExplorer && styles.cardAlternative,
+        showAltNotice && styles.cardAlt,
       ]}
       onPress={() => onPress(train)}
       activeOpacity={0.88}
     >
-      {/* Top Header: Train Number, Name and Chevron */}
+      {/* ── Header: Train Number + Name ── */}
       <View style={styles.headerRow}>
         <View style={styles.numberAndName}>
           <Text style={styles.trainNumber}>{train.trainNumber}</Text>
@@ -119,25 +171,39 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         <Ionicons name="chevron-forward" size={18} color="#A89D96" />
       </View>
 
-      {/* Route and Journey Type row */}
+      {/* ── Route subtitle & Journey Type (Consistent across all tabs) ── */}
       <View style={styles.routeAndTypeRow}>
-        <Text style={styles.routeSubtitle} numberOfLines={1}>
-          {fromName} → {toName}
-        </Text>
+        <View style={styles.routeWithTag}>
+          <Text style={styles.routeSubtitle} numberOfLines={1}>
+            {fromName} → {toName}
+          </Text>
+          {/* {isDirectionalSegment && (
+            <View style={[styles.directionChip, { backgroundColor: segment.directionBg }]}>
+              <Ionicons
+                name={segment.direction === '→ Mumbai' ? 'business-outline' : 'sunny-outline'}
+                size={10}
+                color={segment.directionColor}
+              />
+              <Text style={[styles.directionChipText, { color: segment.directionColor }]}>
+                {segment.direction}
+              </Text>
+            </View>
+          )} */}
+        </View>
         <View style={[styles.badgeJourneyType, { backgroundColor: journeyType.bg }]}>
-          <Text style={[styles.badgeJourneyTypeText, { color: journeyType.text }]}>
+          <Text style={[styles.badgeJourneyTypeText, { color: journeyType.text }]} numberOfLines={1}>
             {journeyType.label}
           </Text>
         </View>
       </View>
 
-      {/* Main Timings & Duration Row */}
+      {/* ── Main Timings & Duration Row (Consistent across all tabs) ── */}
       <View style={styles.timingSection}>
         <Text style={styles.timeText}>{depTime}</Text>
         <View style={styles.durationTrack}>
           <View style={styles.trackLine} />
           <View style={styles.durationPill}>
-            <Text style={styles.durationText}>{computedDuration ?? '12h 00m'}</Text>
+            <Text style={styles.durationText}>{computedDur}</Text>
           </View>
         </View>
         <View style={styles.arrCol}>
@@ -148,8 +214,36 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         </View>
       </View>
 
-      {/* Alternative station explanation banner */}
-      {isAlternative ? (
+      {/* ── Halt Banner (Sawantwadi / Ratnagiri specific station) ── */}
+      {segment && segment.direction === 'Halt' && (
+        <View style={styles.haltBanner}>
+          <Ionicons name="pin" size={13} color="#9E3C1B" />
+          <Text style={styles.haltBannerText}>
+            Halt at {segment.fromName}:{' '}
+            <Text style={styles.haltBold}>Arr {segment.fromTime}</Text>
+            {segment.toTime && segment.toTime !== segment.fromTime && (
+              <Text style={styles.haltBold}> · Dep {segment.toTime}</Text>
+            )}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Alternative / Goa notices (explorer All-trains view) ── */}
+      {showAltNotice && (
+        <View style={styles.altNotice}>
+          <Ionicons name="navigate-outline" size={12} color="#D97706" />
+          <Text style={styles.altNoticeText}>Terminates at Sawantwadi Road (38 km from North Goa)</Text>
+        </View>
+      )}
+      {showGoaNotice && (
+        <View style={styles.goaNotice}>
+          <Ionicons name="checkmark-circle-outline" size={12} color="#2E7D32" />
+          <Text style={styles.goaNoticeText}>Direct Goa train with scheduled halts</Text>
+        </View>
+      )}
+
+      {/* ── Journey-search: Alternative station explanation ── */}
+      {!isExplorer && isAlternative && (
         <View style={styles.altExplanationBox}>
           <View style={styles.altBadgeRow}>
             <View style={styles.altBadge}>
@@ -165,7 +259,10 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
             <Text style={styles.transitRoadHint}>🚌 {roadTravelTip ?? 'Continue to Goa by road'}</Text>
           </View>
         </View>
-      ) : (
+      )}
+
+      {/* ── Journey-search: Goa station pill ── */}
+      {!isExplorer && !isAlternative && (
         <View style={styles.goaStationPillRow}>
           <View style={styles.goaStationPill}>
             <Ionicons name="location" size={12} color="#1E824C" />
@@ -174,23 +271,17 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         </View>
       )}
 
-      {/* Bottom Features / Badges Row */}
+      {/* ── Footer: Running days + Goa stops ── */}
       <View style={styles.badgesRow}>
-        {!isAlternative && goaStopsCount > 0 && (
+        {!isAlternative && goaStopsCount > 0 && !isExplorer && (
           <View style={styles.badgeGoa}>
             <Ionicons name="leaf-outline" size={12} color="#8A4A1C" />
             <Text style={styles.badgeGoaText}>{goaStopsCount} Goa stops</Text>
           </View>
         )}
-
         <View style={styles.badgeRuns}>
           <Ionicons name="calendar-outline" size={12} color="#1E824C" />
           <Text style={styles.badgeRunsText}>{runsText}</Text>
-        </View>
-
-        <View style={styles.badgeTatkal}>
-          <Ionicons name="ticket-outline" size={12} color="#C0392B" />
-          <Text style={styles.badgeTatkalText}>Tatkal</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -206,7 +297,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
-    marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#EFEAE6',
@@ -222,7 +312,11 @@ const styles = StyleSheet.create({
   },
   cardAlternative: {
     borderLeftWidth: 3.5,
-    borderLeftColor: '#D97706', // Warm amber indicator for alternative stations
+    borderLeftColor: '#D97706',
+  },
+  cardAlt: {
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#D97706',
   },
   headerRow: {
     flexDirection: 'row',
@@ -253,15 +347,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
     gap: 8,
+  },
+  routeWithTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+    marginRight: 8,
   },
   routeSubtitle: {
     fontSize: 13,
     color: '#7A6B63',
     fontWeight: '600',
+    flexShrink: 1,
+  },
+  directionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
+  },
+  directionChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  badgeJourneyType: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeJourneyTypeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // ── Halt Banner ───────────────────────────────────────────────────────────
+  haltBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDF4F0',
+    borderWidth: 1,
+    borderColor: '#F2D7CD',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+    marginBottom: 10,
+  },
+  haltBannerText: {
+    fontSize: 12,
+    color: '#5C4E46',
     flex: 1,
   },
+  haltBold: {
+    fontWeight: '800',
+    color: '#9E3C1B',
+  },
+
+  // ── Timing Row ────────────────────────────────────────────────────────────
   timingSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -309,15 +460,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#7A6B63',
   },
-  badgeJourneyType: {
-    paddingVertical: 3,
-    paddingHorizontal: 7,
+
+  // ── Explorer notices ──────────────────────────────────────────────────────
+  altNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 6,
+    gap: 6,
+    marginBottom: 8,
   },
-  badgeJourneyTypeText: {
+  altNoticeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: '#92400E',
+    flex: 1,
   },
+  goaNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF5EB',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 6,
+    marginBottom: 8,
+  },
+  goaNoticeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2E7D32',
+    flex: 1,
+  },
+
+  // ── Journey-search: Alternative station explanation ───────────────────────
   altExplanationBox: {
     backgroundColor: '#FFFBEB',
     borderWidth: 1,
@@ -366,6 +544,8 @@ const styles = StyleSheet.create({
     color: '#78350F',
     fontWeight: '500',
   },
+
+  // ── Journey-search: Goa station pill ─────────────────────────────────────
   goaStationPillRow: {
     marginTop: 8,
     marginBottom: 2,
@@ -385,6 +565,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E824C',
   },
+
+  // ── Footer badges ─────────────────────────────────────────────────────────
   badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -419,19 +601,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#1E824C',
-  },
-  badgeTatkal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FDEEEE',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  badgeTatkalText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#C0392B',
   },
 });

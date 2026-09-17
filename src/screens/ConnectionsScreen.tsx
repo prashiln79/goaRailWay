@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Modal,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,7 +84,7 @@ export const ConnectionsScreen: React.FC = () => {
             key={option.id}
             option={option}
             onPressDetails={handlePressTrain}
-            onCheckAvailability={handleCheckBoth}
+            onViewJourney={handleCheckBoth}
           />
         ))}
 
@@ -93,7 +94,7 @@ export const ConnectionsScreen: React.FC = () => {
             key={option.id}
             option={option}
             onPressDetails={handlePressTrain}
-            onCheckAvailability={handleCheckBoth}
+            onViewJourney={handleCheckBoth}
           />
         ))}
 
@@ -101,15 +102,15 @@ export const ConnectionsScreen: React.FC = () => {
         <View style={styles.strategyBox}>
           <View style={styles.strategyTitleRow}>
             <Ionicons name="bulb-outline" size={18} color="#D97706" />
-            <Text style={styles.strategyTitle}>Station-wise Booking Strategy</Text>
+            <Text style={styles.strategyTitle}>Split Journey Strategy</Text>
           </View>
           <Text style={styles.strategyText}>
-            Separate journey segments may have separate quota availability. Often when Mumbai to Goa tickets are fully waitlisted, tickets to Ratnagiri or Kankavli remain available in Tatkal or General quota.
+            When direct tickets are unavailable, booking two separate segments often gives you more options. Search each leg independently on IRCTC.
           </Text>
         </View>
       </ScrollView>
 
-      {/* Segment Availability Breakdown Modal */}
+      {/* Segment Journey Detail Modal */}
       <Modal
         visible={selectedOptionForModal !== null}
         transparent
@@ -118,7 +119,7 @@ export const ConnectionsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Segment Booking Strategy</Text>
+              <Text style={styles.modalTitle}>Journey Details</Text>
               <TouchableOpacity
                 onPress={() => setSelectedOptionForModal(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -130,17 +131,14 @@ export const ConnectionsScreen: React.FC = () => {
             {selectedOptionForModal && (
               <ScrollView showsVerticalScrollIndicator={false}>
                 <Text style={styles.strategySubheader}>
-                  Try splitting your journey into 2 bookings:
+                  Split your journey across {selectedOptionForModal.segments.length} trains:
                 </Text>
 
                 {selectedOptionForModal.segments.map((seg, idx) => (
                   <View key={seg.trainNumber} style={styles.modalSegmentCard}>
                     <View style={styles.segBadgeRow}>
                       <View style={styles.segBadge}>
-                        <Text style={styles.segBadgeText}>Segment {idx + 1}</Text>
-                      </View>
-                      <View style={styles.availPill}>
-                        <Text style={styles.availPillText}>{seg.availabilitySample ?? 'Available'}</Text>
+                        <Text style={styles.segBadgeText}>Train {idx + 1}</Text>
                       </View>
                     </View>
                     <Text style={styles.segTrainName}>
@@ -154,9 +152,9 @@ export const ConnectionsScreen: React.FC = () => {
                 ))}
 
                 <View style={styles.disclaimerBox}>
-                  <Ionicons name="shield-outline" size={16} color="#8A4A1C" />
+                  <Ionicons name="information-circle-outline" size={16} color="#8A4A1C" />
                   <Text style={styles.disclaimerText}>
-                    Separate journey segments have independent seat inventories. Booking two segments requires two PNRs. Ensure comfortable layover buffer for connecting trains.
+                    Each train segment requires a separate ticket. Ensure comfortable layover time at your connection station.
                   </Text>
                 </View>
 
@@ -164,13 +162,11 @@ export const ConnectionsScreen: React.FC = () => {
                   style={styles.modalCta}
                   onPress={() => {
                     setSelectedOptionForModal(null);
-                    navigation.navigate('Availability', {
-                      trainNumber: selectedOptionForModal.segments[0].trainNumber,
-                    });
+                    Linking.openURL('https://www.irctc.co.in/nget/train-search').catch(() => {});
                   }}
                 >
-                  <Text style={styles.modalCtaText}>Check Segment 1 Availability</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                  <Text style={styles.modalCtaText}>Book on IRCTC</Text>
+                  <Ionicons name="open-outline" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
               </ScrollView>
             )}

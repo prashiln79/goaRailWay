@@ -7,13 +7,13 @@ import { STATION_MAP } from '../data/stations';
 interface ConnectionCardProps {
   option: ConnectionOption;
   onPressDetails?: (trainNumber: string) => void;
-  onCheckAvailability?: (option: ConnectionOption) => void;
+  onViewJourney?: (option: ConnectionOption) => void;
 }
 
 export const ConnectionCard: React.FC<ConnectionCardProps> = ({
   option,
   onPressDetails,
-  onCheckAvailability,
+  onViewJourney,
 }) => {
   const isDirect = option.type === 'direct';
 
@@ -28,9 +28,6 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
           <View style={styles.directBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#1E824C" />
             <Text style={styles.directBadgeText}>Direct Train</Text>
-          </View>
-          <View style={styles.availBadge}>
-            <Text style={styles.availBadgeText}>Available</Text>
           </View>
         </View>
 
@@ -136,7 +133,7 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
 
         <TouchableOpacity
           style={styles.viewJourneyBtn}
-          onPress={() => onCheckAvailability && onCheckAvailability(option)}
+          onPress={() => onViewJourney && onViewJourney(option)}
           activeOpacity={0.85}
         >
           <Text style={styles.viewJourneyText}>View journey</Text>
@@ -188,17 +185,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E824C',
   },
-  availBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  availBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2E7D32',
-  },
+
   connectionHeaderBadge: {
     flexDirection: 'row',
     alignItems: 'center',

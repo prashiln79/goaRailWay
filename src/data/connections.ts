@@ -1,66 +1,16 @@
-import { AvailabilityItem, ConnectionOption } from '../types/Connection';
-
-export const MOCK_AVAILABILITY: Record<string, AvailabilityItem[]> = {
-  default: [
-    { trainClass: '1A', generalStatus: 'WL 12', tatkalStatus: 'WL 4', statusSummary: 'High demand' },
-    { trainClass: '2A', generalStatus: 'WL 28', tatkalStatus: 'WL 16', statusSummary: 'High demand' },
-    { trainClass: '3A', generalStatus: 'WL 45', tatkalStatus: 'WL 22', statusSummary: 'High demand' },
-    { trainClass: 'SL', generalStatus: 'Available', tatkalStatus: 'RAC 8', statusSummary: 'Try Tatkal' },
-    { trainClass: 'CC', generalStatus: 'Available', tatkalStatus: 'Available', statusSummary: 'Good chance' },
-  ],
-  '12619': [
-    { trainClass: '1A', generalStatus: 'WL 12', tatkalStatus: 'WL 4', statusSummary: 'High demand' },
-    { trainClass: '2A', generalStatus: 'WL 28', tatkalStatus: 'WL 16', statusSummary: 'High demand' },
-    { trainClass: '3A', generalStatus: 'WL 45', tatkalStatus: 'WL 22', statusSummary: 'High demand' },
-    { trainClass: 'SL', generalStatus: 'Available', tatkalStatus: 'RAC 8', statusSummary: 'Try Tatkal' },
-    { trainClass: 'CC', generalStatus: 'Available', tatkalStatus: 'Available', statusSummary: 'Good chance' },
-  ],
-  '10103': [
-    { trainClass: '2A', generalStatus: 'WL 15', tatkalStatus: 'WL 6', statusSummary: 'High demand' },
-    { trainClass: '3A', generalStatus: 'WL 30', tatkalStatus: 'RAC 5', statusSummary: 'Try Tatkal' },
-    { trainClass: 'SL', generalStatus: 'RAC 14', tatkalStatus: 'Available', statusSummary: 'Good chance' },
-    { trainClass: '2S', generalStatus: 'Available', tatkalStatus: 'Available', statusSummary: 'Available' },
-  ],
-  '22229': [
-    { trainClass: 'CC', generalStatus: 'Available', tatkalStatus: 'Available', statusSummary: 'Available' },
-    { trainClass: '1A', generalStatus: 'WL 5', tatkalStatus: 'Available', statusSummary: 'Good chance' },
-  ],
-};
+import { ConnectionOption } from '../types/Connection';
 
 export const MOCK_CONNECTIONS: ConnectionOption[] = [
   {
-    id: 'conn-1',
-    type: 'direct',
-    tag: 'Direct Journey',
-    fromStationCode: 'LTT',
-    toStationCode: 'THVM',
-    totalDuration: '7h 40m',
-    segments: [
-      {
-        trainNumber: '12619',
-        trainName: 'Matsyagandha Express',
-        trainType: 'Express',
-        fromStationCode: 'LTT',
-        toStationCode: 'THVM',
-        departureTime: '15:20',
-        arrivalTime: '03:20',
-        dayOffset: 1,
-        duration: '7h 40m',
-        availabilitySample: 'WL 12 / RAC 8',
-      },
-    ],
-    note: '5 Goa stops · Daily service',
-  },
-  {
     id: 'conn-2',
     type: 'connecting',
-    tag: 'Better Connection Option',
+    tag: 'Connection Option',
     fromStationCode: 'LTT',
     toStationCode: 'THVM',
     connectionStationCode: 'RN',
     connectionTime: '1h 15m',
     totalDuration: '13h 10m',
-    note: 'Often better chances in Tatkal quota when direct seats are exhausted.',
+    note: 'Break journey at Ratnagiri — often easier to find seats on each segment independently.',
     segments: [
       {
         trainNumber: '12619',
@@ -72,11 +22,10 @@ export const MOCK_CONNECTIONS: ConnectionOption[] = [
         arrivalTime: '22:00',
         dayOffset: 0,
         duration: '6h 40m',
-        availabilitySample: 'Available (3A, SL)',
       },
       {
         trainNumber: '50104',
-        trainName: 'Ratnagiri - Madgaon Passenger',
+        trainName: 'Ratnagiri – Madgaon Passenger',
         trainType: 'Passenger',
         fromStationCode: 'RN',
         toStationCode: 'THVM',
@@ -84,14 +33,13 @@ export const MOCK_CONNECTIONS: ConnectionOption[] = [
         arrivalTime: '03:20',
         dayOffset: 1,
         duration: '4h 05m',
-        availabilitySample: 'Available (2S, SL)',
       },
     ],
   },
   {
     id: 'conn-3',
     type: 'connecting',
-    tag: 'Another Option',
+    tag: 'Connection Option',
     fromStationCode: 'CSMT',
     toStationCode: 'THVM',
     connectionStationCode: 'KKW',
@@ -109,7 +57,6 @@ export const MOCK_CONNECTIONS: ConnectionOption[] = [
         arrivalTime: '07:37',
         dayOffset: 1,
         duration: '9h 27m',
-        availabilitySample: 'RAC 4',
       },
       {
         trainNumber: '10103',
@@ -121,7 +68,6 @@ export const MOCK_CONNECTIONS: ConnectionOption[] = [
         arrivalTime: '20:40',
         dayOffset: 1,
         duration: '3h 03m',
-        availabilitySample: 'Available',
       },
     ],
   },
