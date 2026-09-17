@@ -31,7 +31,6 @@ const SearchScreen: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -195,7 +194,7 @@ const SearchScreen: React.FC = () => {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
-              {searching ? 'Searching...' : 'No results found'}
+              No results found
             </Text>
           }
           contentContainerStyle={styles.listContent}

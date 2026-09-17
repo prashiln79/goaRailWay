@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   StatusBar,
@@ -12,78 +12,53 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Station } from '../types/Station';
-import { STATIONS } from '../data/stations';
+import {
+  GOA_STATIONS_DATA,
+  NEARBY_ALTERNATIVE_STATIONS_DATA,
+  GoaStationInfo,
+  NearbyAlternativeStationInfo,
+} from '../data/stationAlternatives';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
-type StationsListNavProp = StackNavigationProp<RootStackParamList>;
-type CategoryType = 'All' | 'Goa' | 'Konkan' | 'Maharashtra';
+type StationsNavProp = StackNavigationProp<RootStackParamList>;
 
 export const StationsListScreen: React.FC = () => {
-  const navigation = useNavigation<StationsListNavProp>();
+  const navigation = useNavigation<StationsNavProp>();
   const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<CategoryType>('All');
+  const q = query.toLowerCase().trim();
 
-  // Filter stations
-  const { goaStations, konkanStations, maharashtraStations } = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-
-    const matches = (s: Station) => {
-      if (!q) return true;
-      return (
+  // Filter Goa Stations
+  const filteredGoa = useMemo(() => {
+    if (!q) return GOA_STATIONS_DATA;
+    return GOA_STATIONS_DATA.filter(
+      s =>
         s.name.toLowerCase().includes(q) ||
         s.code.toLowerCase().includes(q) ||
-        s.state.toLowerCase().includes(q)
-      );
-    };
-
-    const goa = STATIONS.filter(s => s.state === 'Goa' && matches(s));
-    const konkan = STATIONS.filter(
-      s => s.state === 'Maharashtra' && ['RN', 'KKW', 'SWV', 'CHI', 'KHED', 'ROHA', 'MNDA', 'PER'].includes(s.code) && matches(s),
+        s.region.toLowerCase().includes(q) ||
+        (s.nearbyDestinations && s.nearbyDestinations.toLowerCase().includes(q)),
     );
-    const maha = STATIONS.filter(
-      s => s.state === 'Maharashtra' && !konkan.some(k => k.code === s.code) && matches(s),
+  }, [q]);
+
+  // Filter Nearby Alternative Stations
+  const filteredNearby = useMemo(() => {
+    if (!q) return NEARBY_ALTERNATIVE_STATIONS_DATA;
+    return NEARBY_ALTERNATIVE_STATIONS_DATA.filter(
+      s =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        s.state.toLowerCase().includes(q) ||
+        s.alternativeFor.toLowerCase().includes(q) ||
+        s.usefulRegion.toLowerCase().includes(q),
     );
+  }, [q]);
 
-    return { goaStations: goa, konkanStations: konkan, maharashtraStations: maha };
-  }, [searchQuery]);
+  const northGoaAlternatives = filteredNearby.filter(s => s.usefulRegion === 'North Goa');
+  const southGoaAlternatives = filteredNearby.filter(s => s.usefulRegion === 'South Goa');
 
-  const handleStationPress = (station: Station) => {
-    navigation.navigate('StationDetails', { stationCode: station.code });
-  };
-
-  const renderStationCard = (station: Station, isGoa = false) => {
-    return (
-      <TouchableOpacity
-        key={station.code}
-        style={styles.stationCard}
-        onPress={() => handleStationPress(station)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.stationLeft}>
-          <View style={[styles.stationIconBox, isGoa ? styles.iconGoa : styles.iconKonkan]}>
-            <Ionicons
-              name={isGoa ? 'leaf' : 'business'}
-              size={15}
-              color={isGoa ? '#1E824C' : '#2563EB'}
-            />
-          </View>
-          <View style={styles.nameBlock}>
-            <Text style={styles.stationName}>{station.name}</Text>
-            <Text style={styles.stationZone}>{station.state} · {station.zone ?? 'KR'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.codeAndArrow}>
-          <View style={styles.codeBadge}>
-            <Text style={styles.codeBadgeText}>{station.code}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#B5A9A1" />
-        </View>
-      </TouchableOpacity>
-    );
+  const handleStationPress = (stationCode: string) => {
+    navigation.navigate('StationDetails', { stationCode });
   };
 
   return (
@@ -93,73 +68,125 @@ export const StationsListScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Stations</Text>
+        <Text style={styles.subtitle}>Goa stations and nearby alternatives</Text>
       </View>
 
-      {/* Search Input Bar */}
+      {/* Search Field */}
       <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={18} color="#8A7A71" />
         <TextInput
           style={styles.input}
-          placeholder="Search station name or code..."
+          placeholder="Search station or area (e.g. Thivim, Panaji, North Goa)"
           placeholderTextColor="#A0938C"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+          value={query}
+          onChangeText={setQuery}
           clearButtonMode="while-editing"
         />
       </View>
 
-      {/* Category Pills */}
-      <View style={styles.categoryRow}>
-        {(['All', 'Goa', 'Konkan', 'Maharashtra'] as CategoryType[]).map(cat => {
-          const isActive = activeCategory === cat;
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-              onPress={() => setActiveCategory(cat)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <FlatList
-        data={['content']}
-        keyExtractor={() => 'key'}
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
-        renderItem={() => (
-          <View>
-            {/* Goa Stations Section */}
-            {(activeCategory === 'All' || activeCategory === 'Goa') && goaStations.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionHeader}>Goa Stations</Text>
-                {goaStations.map(s => renderStationCard(s, true))}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
+      >
+        {/* GOA STATIONS SECTION */}
+        {filteredGoa.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>GOA</Text>
+
+            {filteredGoa.map((station: GoaStationInfo) => (
+              <TouchableOpacity
+                key={station.code}
+                style={styles.stationCard}
+                onPress={() => handleStationPress(station.code)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.stationName}>{station.name}</Text>
+                  <View style={styles.codeBadge}>
+                    <Text style={styles.stationCode}>{station.code}</Text>
+                  </View>
+                </View>
+                <Text style={styles.regionText}>{station.region}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* NEARBY STATIONS SECTION */}
+        {filteredNearby.length > 0 && (
+          <View style={[styles.section, styles.nearbySection]}>
+            {/* <Text style={styles.sectionTitle}>NEARBY STATIONS</Text>
+            <Text style={styles.sectionSubtitle}>Alternative stations outside Goa</Text> */}
+
+            {/* NEARBY FOR NORTH GOA */}
+            {northGoaAlternatives.length > 0 && (
+              <View style={styles.groupBlock}>
+                <Text style={styles.groupHeader}>NEARBY FOR NORTH GOA</Text>
+                {northGoaAlternatives.map((station: NearbyAlternativeStationInfo) => (
+                  <TouchableOpacity
+                    key={station.code}
+                    style={[styles.stationCard, styles.nearbyCard]}
+                    onPress={() => handleStationPress(station.code)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.cardHeaderRow}>
+                      <Text style={styles.stationName}>{station.name}</Text>
+                      <View style={styles.codeBadge}>
+                        <Text style={styles.stationCode}>{station.code}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.stateText}>{station.state}</Text>
+                    <View style={styles.distanceBadgeRow}>
+                      <Text style={styles.distanceText}>{station.distanceLabel}</Text>
+                      <Text style={styles.bulletSeparator}>•</Text>
+                      <Text style={styles.altText}>{station.alternativeFor}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
 
-            {/* Konkan Stations Section */}
-            {(activeCategory === 'All' || activeCategory === 'Konkan') && konkanStations.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionHeader}>Konkan Stations</Text>
-                {konkanStations.map(s => renderStationCard(s, false))}
-              </View>
-            )}
-
-            {/* Other Maharashtra Stations Section */}
-            {(activeCategory === 'All' || activeCategory === 'Maharashtra') && maharashtraStations.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionHeader}>Maharashtra Stations</Text>
-                {maharashtraStations.map(s => renderStationCard(s, false))}
+            {/* NEARBY FOR SOUTH GOA */}
+            {southGoaAlternatives.length > 0 && (
+              <View style={styles.groupBlock}>
+                <Text style={styles.groupHeader}>NEARBY FOR SOUTH GOA</Text>
+                {southGoaAlternatives.map((station: NearbyAlternativeStationInfo) => (
+                  <TouchableOpacity
+                    key={station.code}
+                    style={[styles.stationCard, styles.nearbyCard]}
+                    onPress={() => handleStationPress(station.code)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.cardHeaderRow}>
+                      <Text style={styles.stationName}>{station.name}</Text>
+                      <View style={styles.codeBadge}>
+                        <Text style={styles.stationCode}>{station.code}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.stateText}>{station.state}</Text>
+                    <View style={styles.distanceBadgeRow}>
+                      <Text style={styles.distanceText}>{station.distanceLabel}</Text>
+                      <Text style={styles.bulletSeparator}>•</Text>
+                      <Text style={styles.altText}>{station.alternativeFor}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
           </View>
         )}
-      />
+
+        {/* Empty Search Notice */}
+        {filteredGoa.length === 0 && filteredNearby.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={36} color="#A8998E" />
+            <Text style={styles.emptyTitle}>No matching stations found</Text>
+            <Text style={styles.emptySubtitle}>
+              Try searching "North Goa", "Thivim", "Madgaon", or "Panaji".
+            </Text>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -169,132 +196,172 @@ export default StationsListScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAF7F4',
+    backgroundColor: '#FAF7F4', // Warm cream background
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
     color: '#2C201A',
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#8A7A71',
+    marginTop: 2,
+    fontWeight: '500',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF', // Soft sand / ivory
+    borderRadius: 16,
     marginHorizontal: 16,
     paddingHorizontal: 14,
-    height: 46,
+    height: 48,
     borderWidth: 1,
     borderColor: '#EFEAE6',
-    marginTop: 6,
+    marginTop: 10,
+    marginBottom: 8,
   },
   input: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 15,
+    fontSize: 14,
     color: '#2C201A',
   },
-  categoryRow: {
-    flexDirection: 'row',
+  scrollContent: {
     paddingHorizontal: 16,
-    marginVertical: 12,
-    gap: 8,
-  },
-  categoryChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#EFEAE6',
-  },
-  categoryChipActive: {
-    backgroundColor: '#9E3C1B',
-    borderColor: '#9E3C1B',
-  },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B584E',
-  },
-  categoryChipTextActive: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   section: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
-  sectionHeader: {
-    fontSize: 15,
+  nearbySection: {
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 12,
     fontWeight: '800',
-    color: '#2C201A',
+    color: '#8A7A71',
+    letterSpacing: 0.8,
     marginBottom: 8,
+    marginLeft: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#7A6B63',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  groupBlock: {
+    marginBottom: 12,
+  },
+  groupHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9E3C1B', // Terracotta accent
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   stationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  nearbyCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#9E3C1B', // Terracotta indicator
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#EFEAE6',
-  },
-  stationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  stationIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconGoa: {
-    backgroundColor: '#EBF7EE',
-  },
-  iconKonkan: {
-    backgroundColor: '#EFF6FF',
-  },
-  nameBlock: {
-    flex: 1,
   },
   stationName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#2C201A',
-  },
-  stationZone: {
-    fontSize: 12,
-    color: '#8A7A71',
-    marginTop: 2,
-  },
-  codeAndArrow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    marginRight: 10,
   },
   codeBadge: {
     backgroundColor: '#F3EFEA',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
+    minWidth: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  codeBadgeText: {
+  stationCode: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#8A4A1C',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  regionText: {
+    fontSize: 13,
+    color: '#7A6B63',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  stateText: {
+    fontSize: 12,
+    color: '#8A7A71',
+    marginTop: 2,
+  },
+  distanceBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 6,
+    gap: 6,
+  },
+  distanceText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#554238',
+    color: '#2C201A',
+  },
+  bulletSeparator: {
+    color: '#C4B7AF',
+    fontSize: 12,
+  },
+  altText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1E824C', // Muted green for useful alternative
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#382A22',
+    marginTop: 10,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#8A7A71',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

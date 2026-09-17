@@ -12,25 +12,57 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Station } from '../types/Station';
+import { StationOption } from '../types/JourneyResult';
 import { STATIONS } from '../data/stations';
 
 interface SearchStationModalProps {
   visible: boolean;
   title: string;
+  isDestination?: boolean;
   onClose: () => void;
-  onSelectStation: (station: Station) => void;
+  onSelectStation: (station: StationOption) => void;
 }
+
+export const AREA_DESTINATIONS: StationOption[] = [
+  {
+    code: 'GOA_NORTH',
+    name: 'North Goa',
+    state: 'Goa',
+    isArea: true,
+    areaType: 'GOA_NORTH',
+    subtitle: 'Includes Thivim & nearby (Sawantwadi, Kudal, Kankavli, Belagavi)',
+  },
+  {
+    code: 'GOA_SOUTH',
+    name: 'South Goa',
+    state: 'Goa',
+    isArea: true,
+    areaType: 'GOA_SOUTH',
+    subtitle: 'Includes Madgaon, Canacona, Vasco & nearby (Karwar)',
+  },
+  {
+    code: 'GOA_ALL',
+    name: 'All Goa & Alternatives',
+    state: 'Goa',
+    isArea: true,
+    areaType: 'GOA_ALL',
+    subtitle: 'Considers all Goa terminals and nearby corridor alternatives',
+  },
+];
 
 export const SearchStationModal: React.FC<SearchStationModalProps> = ({
   visible,
   title,
+  isDestination = false,
   onClose,
   onSelectStation,
 }) => {
   const [query, setQuery] = useState('');
 
+  const q = query.toLowerCase().trim();
+
+  // Filter regular stations
   const filteredStations = STATIONS.filter(s => {
-    const q = query.toLowerCase().trim();
     if (!q) return true;
     return (
       s.name.toLowerCase().includes(q) ||
@@ -39,9 +71,32 @@ export const SearchStationModal: React.FC<SearchStationModalProps> = ({
     );
   });
 
-  const popularStations = STATIONS.filter(s =>
-    ['LTT', 'CSMT', 'PNVL', 'RN', 'KKW', 'SWV', 'THVM', 'KRMI', 'MAO'].includes(s.code),
-  );
+  // Filter area destinations
+  const filteredAreas = isDestination
+    ? AREA_DESTINATIONS.filter(a => {
+        if (!q) return true;
+        return (
+          a.name.toLowerCase().includes(q) ||
+          (a.subtitle && a.subtitle.toLowerCase().includes(q))
+        );
+      })
+    : [];
+
+  const popularStations: StationOption[] = isDestination
+    ? [
+        AREA_DESTINATIONS[0], // North Goa
+        AREA_DESTINATIONS[1], // South Goa
+        { code: 'THVM', name: 'Thivim', state: 'Goa' },
+        { code: 'MAO', name: 'Madgaon', state: 'Goa' },
+        { code: 'SWV', name: 'Sawantwadi Road', state: 'Maharashtra' },
+        { code: 'KUDL', name: 'Kudal', state: 'Maharashtra' },
+      ]
+    : [
+        { code: 'LTT', name: 'Mumbai LTT', state: 'Maharashtra' },
+        { code: 'CSMT', name: 'Mumbai CSMT', state: 'Maharashtra' },
+        { code: 'PNVL', name: 'Panvel', state: 'Maharashtra' },
+        { code: 'RN', name: 'Ratnagiri', state: 'Maharashtra' },
+      ];
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -63,7 +118,7 @@ export const SearchStationModal: React.FC<SearchStationModalProps> = ({
             <Ionicons name="search" size={18} color="#8A7A71" />
             <TextInput
               style={styles.input}
-              placeholder="Search station or code (e.g. THVM, LTT)"
+              placeholder={isDestination ? "Search region (North Goa) or station (Thivim, SWV)" : "Search origin station or code (e.g. LTT, CSMT)"}
               placeholderTextColor="#A0938C"
               value={query}
               onChangeText={setQuery}
@@ -75,36 +130,68 @@ export const SearchStationModal: React.FC<SearchStationModalProps> = ({
           {/* Quick chips if no query */}
           {!query && (
             <View style={styles.quickSection}>
-              <Text style={styles.sectionTitle}>Popular Stations</Text>
+              <Text style={styles.sectionTitle}>{isDestination ? 'Recommended Regions & Stations' : 'Popular Origin Stations'}</Text>
               <View style={styles.chipsRow}>
                 {popularStations.map(station => (
                   <TouchableOpacity
                     key={station.code}
-                    style={styles.stationChip}
+                    style={[styles.stationChip, station.isArea && styles.areaChip]}
                     onPress={() => {
                       onSelectStation(station);
                       onClose();
                     }}
                   >
-                    <Text style={styles.stationChipText}>{station.name}</Text>
-                    <Text style={styles.stationChipCode}>{station.code}</Text>
+                    {station.isArea && <Ionicons name="sparkles" size={12} color="#9E3C1B" style={{ marginRight: 2 }} />}
+                    <Text style={[styles.stationChipText, station.isArea && styles.areaChipText]}>{station.name}</Text>
+                    {!station.isArea && <Text style={styles.stationChipCode}>{station.code}</Text>}
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           )}
 
-          {/* Station list */}
+          {/* List: Areas first (if destination), then stations */}
           <FlatList
             data={filteredStations}
             keyExtractor={item => item.code}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
+            ListHeaderComponent={
+              filteredAreas.length > 0 ? (
+                <View style={styles.areaSection}>
+                  <Text style={styles.areaSectionTitle}>GOA REGIONS (INCLUDES NEARBY ALTERNATIVES)</Text>
+                  {filteredAreas.map(area => (
+                    <TouchableOpacity
+                      key={area.code}
+                      style={styles.areaItem}
+                      onPress={() => {
+                        onSelectStation(area);
+                        onClose();
+                      }}
+                    >
+                      <View style={styles.areaIconBox}>
+                        <Ionicons name="navigate-circle" size={24} color="#9E3C1B" />
+                      </View>
+                      <View style={styles.areaDetails}>
+                        <Text style={styles.areaName}>{area.name}</Text>
+                        <Text style={styles.areaSubtitle}>{area.subtitle}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  <Text style={[styles.areaSectionTitle, { marginTop: 14 }]}>SPECIFIC STATIONS</Text>
+                </View>
+              ) : null
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.stationItem}
                 onPress={() => {
-                  onSelectStation(item);
+                  onSelectStation({
+                    code: item.code,
+                    name: item.name,
+                    state: item.state,
+                    isArea: false,
+                  });
                   onClose();
                 }}
               >
@@ -136,7 +223,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: '80%',
+    height: '82%',
     paddingTop: 16,
   },
   header: {
@@ -144,7 +231,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   title: {
     fontSize: 18,
@@ -162,21 +249,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingHorizontal: 14,
     height: 46,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   input: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 15,
+    fontSize: 14,
     color: '#2C201A',
   },
   quickSection: {
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#8A7A71',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -198,10 +285,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 6,
   },
+  areaChip: {
+    backgroundColor: '#FFF1EC',
+    borderColor: '#E8B9A6',
+  },
   stationChipText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#8A4A1C',
+  },
+  areaChipText: {
+    fontWeight: '800',
+    color: '#9E3C1B',
   },
   stationChipCode: {
     fontSize: 11,
@@ -211,11 +306,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
+  areaSection: {
+    marginBottom: 6,
+  },
+  areaSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#9E3C1B',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  areaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8F5',
+    borderWidth: 1,
+    borderColor: '#F6DEC6',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  areaIconBox: {
+    marginRight: 12,
+  },
+  areaDetails: {
+    flex: 1,
+  },
+  areaName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  areaSubtitle: {
+    fontSize: 12,
+    color: '#7A6B63',
+    marginTop: 2,
+    lineHeight: 16,
+  },
   stationItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderBottomWidth: 1,
     borderBottomColor: '#F2ECE8',
   },
@@ -223,19 +355,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stationName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#2C201A',
   },
   stationSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#8A7A71',
     marginTop: 2,
   },
   codeBadge: {
     backgroundColor: '#F3EFEA',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
   },
   codeBadgeText: {

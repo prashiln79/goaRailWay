@@ -24,29 +24,29 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
 
     return (
       <View style={styles.card}>
-        {/* Direct Tag Header */}
         <View style={styles.tagRow}>
           <View style={styles.directBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#1E824C" />
-            <Text style={styles.directBadgeText}>Direct Journey</Text>
+            <Text style={styles.directBadgeText}>Direct Train</Text>
           </View>
           <View style={styles.availBadge}>
-            <Text style={styles.availBadgeText}>Likely available</Text>
+            <Text style={styles.availBadgeText}>Available</Text>
           </View>
         </View>
 
-        {/* Train Info */}
         <View style={styles.trainHeader}>
           <Text style={styles.trainNumber}>{seg.trainNumber}</Text>
           <Text style={styles.trainName}>{seg.trainName}</Text>
         </View>
 
+        <Text style={styles.routeSubtitle}>
+          {fromName} → {toName}
+        </Text>
+
         <View style={styles.timingRow}>
           <Text style={styles.timeBold}>{seg.departureTime}</Text>
-          <Text style={styles.stationSub}>{fromName}</Text>
-          <Text style={styles.arrowIcon}> → </Text>
+          <Text style={styles.arrowIcon}>─────────</Text>
           <Text style={styles.timeBold}>{seg.arrivalTime}</Text>
-          <Text style={styles.stationSub}>{toName}</Text>
         </View>
 
         <View style={styles.subInfoRow}>
@@ -55,98 +55,94 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
           <Text style={styles.stopsText}>5 Goa stops</Text>
         </View>
 
-        {/* Bottom tags & Action */}
         <View style={styles.actionRow}>
-          <View style={styles.miniTag}>
-            <Ionicons name="git-commit-outline" size={13} color="#2563EB" />
-            <Text style={styles.miniTagText}>Direct</Text>
-          </View>
-          <View style={styles.miniTagGreen}>
-            <Ionicons name="checkmark" size={13} color="#1E824C" />
-            <Text style={styles.miniTagTextGreen}>Runs today</Text>
-          </View>
-          <View style={{ flex: 1 }} />
           <TouchableOpacity
-            style={styles.viewBtn}
+            style={styles.viewJourneyBtn}
             onPress={() => onPressDetails && onPressDetails(seg.trainNumber)}
           >
-            <Text style={styles.viewBtnText}>View details</Text>
+            <Text style={styles.viewJourneyText}>View journey</Text>
+            <Ionicons name="chevron-forward" size={15} color="#9E3C1B" />
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // Connecting Journey
+  // Connecting Journey option
   const seg1 = option.segments[0];
   const seg2 = option.segments[1];
-  const viaStationName = (option.connectionStationCode && STATION_MAP[option.connectionStationCode]?.name) || option.connectionStationCode || 'Junction';
+  const viaStationName = (option.connectionStationCode && STATION_MAP[option.connectionStationCode]?.name) || option.connectionStationCode || 'Transfer Station';
 
   return (
     <View style={[styles.card, styles.connectingCard]}>
-      {/* Header Badge */}
+      {/* Header: 💡 Connection option */}
       <View style={styles.tagRow}>
-        <View style={styles.starBadge}>
-          <Ionicons name="star" size={13} color="#D97706" />
-          <Text style={styles.starBadgeText}>{option.tag ?? 'Better Connection Option'}</Text>
+        <View style={styles.connectionHeaderBadge}>
+          <Ionicons name="bulb" size={14} color="#D97706" />
+          <Text style={styles.connectionHeaderText}>Connection option</Text>
+        </View>
+        <View style={styles.trainsCountPill}>
+          <Text style={styles.trainsCountPillText}>2 trains</Text>
         </View>
       </View>
 
-      <Text style={styles.tagSubtext}>Often better chances in Tatkal when direct is full</Text>
-
-      {/* Segment 1 */}
-      <View style={styles.segmentContainer}>
-        <View style={styles.stepCircle}>
-          <Text style={styles.stepNum}>1</Text>
-        </View>
-        <View style={styles.segmentDetails}>
+      {/* Train 1 Segment */}
+      <View style={styles.segmentBlock}>
+        <Text style={styles.segmentRouteText}>
+          {STATION_MAP[seg1.fromStationCode]?.name ?? seg1.fromStationCode} → {STATION_MAP[seg1.toStationCode]?.name ?? seg1.toStationCode}
+        </Text>
+        <View style={styles.trainRow}>
           <Text style={styles.segTrainTitle}>
             {seg1.trainNumber} {seg1.trainName}
           </Text>
-          <Text style={styles.segTiming}>
-            {seg1.departureTime} {STATION_MAP[seg1.fromStationCode]?.name ?? seg1.fromStationCode} → {seg1.arrivalTime} {STATION_MAP[seg1.toStationCode]?.name ?? seg1.toStationCode}
+          <Text style={styles.segTimingsText}>
+            {seg1.departureTime} → {seg1.arrivalTime}
           </Text>
         </View>
       </View>
 
-      {/* Connection Buffer */}
-      <View style={styles.layoverRow}>
-        <View style={styles.layoverDottedLine} />
-        <View style={styles.layoverBadge}>
+      {/* Connection Layover Badge in between */}
+      <View style={styles.transferSection}>
+        <View style={styles.transferLine} />
+        <View style={styles.transferBubble}>
           <Ionicons name="time-outline" size={13} color="#8A4A1C" />
-          <Text style={styles.layoverText}>{option.connectionTime ?? '1h 15m'} connection at {viaStationName}</Text>
+          <Text style={styles.transferTimeText}>{option.connectionTime ?? '1h 15m'}</Text>
+          <Text style={styles.transferStationText}>at {viaStationName}</Text>
         </View>
-        <Text style={styles.bufferHint}>Enough time to change platform</Text>
+        <View style={styles.transferLine} />
       </View>
 
-      {/* Segment 2 */}
-      <View style={styles.segmentContainer}>
-        <View style={[styles.stepCircle, styles.stepCircle2]}>
-          <Text style={styles.stepNum}>2</Text>
-        </View>
-        <View style={styles.segmentDetails}>
+      {/* Train 2 Segment */}
+      <View style={styles.segmentBlock}>
+        <Text style={styles.segmentRouteText}>
+          {STATION_MAP[seg2.fromStationCode]?.name ?? seg2.fromStationCode} → {STATION_MAP[seg2.toStationCode]?.name ?? seg2.toStationCode}
+        </Text>
+        <View style={styles.trainRow}>
           <Text style={styles.segTrainTitle}>
             {seg2.trainNumber} {seg2.trainName}
           </Text>
-          <Text style={styles.segTiming}>
-            {seg2.departureTime} {STATION_MAP[seg2.fromStationCode]?.name ?? seg2.fromStationCode} → {seg2.arrivalTime} {STATION_MAP[seg2.toStationCode]?.name ?? seg2.toStationCode}
+          <Text style={styles.segTimingsText}>
+            {seg2.departureTime} → {seg2.arrivalTime}
           </Text>
         </View>
       </View>
 
-      {/* Total Duration Footer */}
-      <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Total journey: <Text style={styles.totalValue}>{option.totalDuration}</Text></Text>
-      </View>
+      {/* Total duration footer */}
+      <View style={styles.footerRow}>
+        <View style={styles.durationInfo}>
+          <Text style={styles.totalDurationText}>{option.totalDuration} total</Text>
+          <Text style={styles.totalTrainsText}>• 2 trains</Text>
+        </View>
 
-      {/* CTA Button */}
-      <TouchableOpacity
-        style={styles.checkBothBtn}
-        onPress={() => onCheckAvailability && onCheckAvailability(option)}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.checkBothBtnText}>Check availability for both trains</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.viewJourneyBtn}
+          onPress={() => onCheckAvailability && onCheckAvailability(option)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.viewJourneyText}>View journey</Text>
+          <Ionicons name="chevron-forward" size={15} color="#9E3C1B" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -169,8 +165,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   connectingCard: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#E67E22',
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#D97706',
   },
   tagRow: {
     flexDirection: 'row',
@@ -203,11 +199,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2E7D32',
   },
+  connectionHeaderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 8,
+    gap: 5,
+  },
+  connectionHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  trainsCountPill: {
+    backgroundColor: '#F3EFEA',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  trainsCountPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7A6B63',
+  },
   trainHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   trainNumber: {
     fontSize: 14,
@@ -219,31 +242,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#382A22',
   },
+  routeSubtitle: {
+    fontSize: 13,
+    color: '#7A6B63',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
   timingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginVertical: 4,
   },
   timeBold: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1C1613',
   },
-  stationSub: {
-    fontSize: 13,
-    color: '#7A6B63',
-    marginLeft: 4,
-  },
   arrowIcon: {
     fontSize: 14,
-    color: '#A0938C',
-    marginHorizontal: 8,
+    color: '#D5C9C0',
+    fontWeight: '800',
+    letterSpacing: -1,
   },
   subInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 8,
     gap: 6,
   },
   durationPill: {
@@ -260,156 +286,107 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'flex-end',
     borderTopWidth: 1,
     borderTopColor: '#F6F2EE',
     paddingTop: 10,
+    marginTop: 6,
   },
-  miniTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    gap: 3,
+  segmentBlock: {
+    backgroundColor: '#FAF7F5',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
   },
-  miniTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  miniTagGreen: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EBF7EE',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    gap: 3,
-  },
-  miniTagTextGreen: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#1E824C',
-  },
-  viewBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    backgroundColor: '#F7F3F0',
-    borderRadius: 6,
-  },
-  viewBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7A4321',
-  },
-  starBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  starBadgeText: {
+  segmentRouteText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B45309',
+    color: '#8A4A1C',
+    marginBottom: 4,
   },
-  tagSubtext: {
-    fontSize: 12,
-    color: '#7A6B63',
-    marginBottom: 12,
-  },
-  segmentContainer: {
+  trainRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginVertical: 4,
-  },
-  stepCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#9E3C1B',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepCircle2: {
-    backgroundColor: '#D97706',
-  },
-  stepNum: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  segmentDetails: {
-    flex: 1,
   },
   segTrainTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#2C201A',
+    flex: 1,
   },
-  segTiming: {
+  segTimingsText: {
     fontSize: 13,
-    color: '#7A6B63',
-    marginTop: 2,
-  },
-  layoverRow: {
-    paddingLeft: 32,
-    marginVertical: 6,
-  },
-  layoverDottedLine: {
-    width: 1,
-    height: 8,
-    backgroundColor: '#D5C9C0',
-    marginBottom: 4,
-  },
-  layoverBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  layoverText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#8A4A1C',
-  },
-  bufferHint: {
-    fontSize: 11,
-    color: '#8A7A71',
-    marginTop: 1,
-  },
-  totalRow: {
-    marginTop: 10,
-    marginBottom: 12,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F6F2EE',
-  },
-  totalLabel: {
-    fontSize: 13,
-    color: '#7A6B63',
-  },
-  totalValue: {
     fontWeight: '700',
     color: '#2C201A',
   },
-  checkBothBtn: {
-    backgroundColor: '#F7EEE7',
-    borderWidth: 1,
-    borderColor: '#E8D5C8',
-    borderRadius: 10,
-    paddingVertical: 10,
+  transferSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginVertical: 6,
+    paddingHorizontal: 8,
   },
-  checkBothBtnText: {
+  transferLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#EFE7E1',
+  },
+  transferBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7F2',
+    borderWidth: 1,
+    borderColor: '#F2DFD5',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    gap: 4,
+  },
+  transferTimeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8A4A1C',
+  },
+  transferStationText: {
+    fontSize: 11,
+    color: '#7A6B63',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F6F2EE',
+  },
+  durationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  totalDurationText: {
     fontSize: 13,
+    fontWeight: '700',
+    color: '#2C201A',
+  },
+  totalTrainsText: {
+    fontSize: 12,
+    color: '#8A7A71',
+  },
+  viewJourneyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7EEE7',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 2,
+  },
+  viewJourneyText: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#8A4A1C',
   },

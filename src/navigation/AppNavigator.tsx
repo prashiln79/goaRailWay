@@ -24,7 +24,6 @@ export type RootStackParamList = {
 
 export type TabParamList = {
   Trains: undefined;
-  Connections: undefined;
   Stations: undefined;
   Saved: undefined;
   More: undefined;
@@ -53,12 +52,11 @@ function BottomTabs() {
           fontSize: 11,
           fontWeight: '700',
         },
-        tabBarActiveTintColor: '#9E3C1B', // Terracotta accent matching the UI mockup
+        tabBarActiveTintColor: '#9E3C1B',
         tabBarInactiveTintColor: '#A8998E',
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
             Trains: { active: 'train', inactive: 'train-outline' },
-            Connections: { active: 'git-branch', inactive: 'git-branch-outline' },
             Stations: { active: 'location', inactive: 'location-outline' },
             Saved: { active: 'bookmark', inactive: 'bookmark-outline' },
             More: { active: 'ellipsis-horizontal', inactive: 'ellipsis-horizontal-outline' },
@@ -68,11 +66,26 @@ function BottomTabs() {
         },
       })}
     >
-      <Tab.Screen name="Trains" component={TrainsHomeScreen} />
-      <Tab.Screen name="Connections" component={ConnectionsScreen} />
-      <Tab.Screen name="Stations" component={StationsListScreen} />
-      <Tab.Screen name="Saved" component={SavedScreen} />
-      <Tab.Screen name="More" component={MoreScreen} />
+      <Tab.Screen
+        name="Trains"
+        component={TrainsHomeScreen}
+        options={{ tabBarLabel: 'Trains' }}
+      />
+      <Tab.Screen
+        name="Stations"
+        component={StationsListScreen}
+        options={{ tabBarLabel: 'Stations' }}
+      />
+      <Tab.Screen
+        name="Saved"
+        component={SavedScreen}
+        options={{ tabBarLabel: 'Saved' }}
+      />
+      <Tab.Screen
+        name="More"
+        component={MoreScreen}
+        options={{ tabBarLabel: 'More' }}
+      />
     </Tab.Navigator>
   );
 }
