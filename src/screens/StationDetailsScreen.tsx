@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -16,20 +16,23 @@ import { Station } from '../types/Station';
 import { trainService } from '../services/trainService';
 import { stationService } from '../services/stationService';
 import { STATION_MAP } from '../data/stations';
-import { getTrainTypeColor } from '../components/TrainCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 type StationDetailsRouteProp = RouteProp<RootStackParamList, 'StationDetails'>;
-type StationDetailsNavProp = StackNavigationProp<RootStackParamList, 'StationDetails'>;
+type StationDetailsNavProp = StackNavigationProp<RootStackParamList>;
 
-const StationDetailsScreen: React.FC = () => {
+type TabOption = 'Overview' | 'Arrivals' | 'Departures' | 'Trains';
+
+export const StationDetailsScreen: React.FC = () => {
   const route = useRoute<StationDetailsRouteProp>();
   const navigation = useNavigation<StationDetailsNavProp>();
+  const insets = useSafeAreaInsets();
   const { stationCode } = route.params;
 
   const [station, setStation] = useState<Station | null>(null);
   const [trains, setTrains] = useState<Train[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabOption>('Overview');
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -38,7 +41,6 @@ const StationDetailsScreen: React.FC = () => {
     ]).then(([st, trs]) => {
       setStation(st);
       setTrains(trs);
-      setLoading(false);
     });
   }, [stationCode]);
 
@@ -49,99 +51,164 @@ const StationDetailsScreen: React.FC = () => {
     [navigation],
   );
 
-  const handleShowOnMap = useCallback(() => {
-    navigation.navigate('MapScreen');
-  }, [navigation]);
+  const popularRoutes = [
+    { from: station?.name ?? stationCode, to: 'Mumbai LTT', trains: '12 trains' },
+    { from: station?.name ?? stationCode, to: 'Madgaon', trains: '18 trains' },
+    { from: station?.name ?? stationCode, to: 'Mangaluru', trains: '10 trains' },
+    { from: station?.name ?? stationCode, to: 'Pune', trains: '4 trains' },
+  ];
 
   const renderTrain = ({ item: train }: { item: Train }) => {
     const src = STATION_MAP[train.sourceStationCode];
     const dst = STATION_MAP[train.destinationStationCode];
-    const color = getTrainTypeColor(train.type);
     const stop = train.stops.find(s => s.stationCode === stationCode);
-    const time = stop?.arrivalTime ?? stop?.departureTime ?? '--:--';
 
     return (
       <TouchableOpacity
-        style={styles.trainRow}
+        style={styles.trainCard}
         onPress={() => handleTrainPress(train)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <Text style={styles.arrivalTime}>{time}</Text>
-        <View style={[styles.typeBar, { backgroundColor: color }]} />
-        <View style={styles.trainBody}>
-          <Text style={styles.trainName}>
-            {train.trainNumber} {train.name}
-          </Text>
-          <Text style={styles.trainRoute}>
-            {src?.name ?? train.sourceStationCode} → {dst?.name ?? train.destinationStationCode}
-          </Text>
+        <View style={styles.trainTopRow}>
+          <Text style={styles.trainNumber}>{train.trainNumber}</Text>
+          <Text style={styles.trainName} numberOfLines={1}>{train.name}</Text>
         </View>
-        <View style={[styles.typeBadge, { backgroundColor: color + '18' }]}>
-          <Text style={[styles.typeBadgeText, { color }]}>{train.type}</Text>
+
+        <Text style={styles.routeText}>
+          {src?.name ?? train.sourceStationCode} → {dst?.name ?? train.destinationStationCode}
+        </Text>
+
+        <View style={styles.timingRow}>
+          <View style={styles.timeTag}>
+            <Text style={styles.timeTagLabel}>Arr: </Text>
+            <Text style={styles.timeTagVal}>{stop?.arrivalTime ?? 'Starts'}</Text>
+          </View>
+          <View style={styles.timeTag}>
+            <Text style={styles.timeTagLabel}>Dep: </Text>
+            <Text style={styles.timeTagVal}>{stop?.departureTime ?? 'Terminates'}</Text>
+          </View>
         </View>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F4" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#374151" />
+      {/* Top Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.iconBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={24} color="#2C201A" />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{station?.name ?? stationCode}</Text>
-          {station?.isGoaStation && (
-            <View style={styles.goaTag}>
-              <Text style={styles.goaTagText}>GOA</Text>
-            </View>
-          )}
+
+        <View style={styles.titleBlock}>
+          <Text style={styles.headerStationTitle}>
+            {station?.name ?? stationCode} ({stationCode})
+          </Text>
+          <Text style={styles.headerStationSub}>
+            {station?.isMajor ? 'Major station' : 'Halt station'} · {station?.state ?? 'Konkan'}
+          </Text>
         </View>
-        <TouchableOpacity onPress={handleShowOnMap} style={styles.mapBtn}>
-          <Ionicons name="map-outline" size={20} color="#1A73E8" />
+
+        <TouchableOpacity
+          onPress={() => setIsFavorite(!isFavorite)}
+          style={styles.iconBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size={22}
+            color={isFavorite ? '#DC2626' : '#2C201A'}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Station info */}
-      {station && (
-        <View style={styles.stationInfo}>
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
-            <Text style={styles.infoText}>
-              {stationCode} · {station.state}
-            </Text>
+      {/* Tabs */}
+      <View style={styles.tabsRow}>
+        {(['Overview', 'Arrivals', 'Departures', 'Trains'] as TabOption[]).map(tab => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabBtnText, isActive && styles.tabBtnTextActive]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <FlatList
+        data={activeTab === 'Trains' ? trains : []}
+        keyExtractor={item => item.trainNumber}
+        renderItem={renderTrain}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.contentBody}>
+            {/* Stat Cards Row */}
+            <View style={styles.statsRow}>
+              <View style={[styles.statCard, { backgroundColor: '#EBF7EE' }]}>
+                <Text style={[styles.statValue, { color: '#1E824C' }]}>28</Text>
+                <Text style={styles.statLabel}>Trains arriving</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: '#EFF6FF' }]}>
+                <Text style={[styles.statValue, { color: '#2563EB' }]}>31</Text>
+                <Text style={styles.statLabel}>Trains departing</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: '#F5F3FF' }]}>
+                <Text style={[styles.statValue, { color: '#7C3AED' }]}>52</Text>
+                <Text style={styles.statLabel}>Total trains</Text>
+              </View>
+            </View>
+
+            {/* About Card */}
+            <View style={styles.infoCard}>
+              <Text style={styles.cardHeader}>About</Text>
+              <Text style={styles.aboutText}>
+                {station?.name ?? stationCode} is a major railway station in {station?.state ?? 'Konkan'}, well connected to Mumbai, Konkan corridor and South Goa. It serves as an essential station for connecting passenger services and major superfast trains.
+              </Text>
+            </View>
+
+            {/* Popular Routes from this Station */}
+            <View style={styles.infoCard}>
+              <Text style={styles.cardHeader}>Popular routes from {station?.name ?? stationCode}</Text>
+              {popularRoutes.map((route, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.popularRow, idx === popularRoutes.length - 1 && { borderBottomWidth: 0 }]}
+                >
+                  <Text style={styles.popRouteText}>
+                    {route.from} → {route.to}
+                  </Text>
+                  <Text style={styles.popRouteCount}>{route.trains}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Trains List Header if tab is not Trains */}
+            {activeTab === 'Overview' && (
+              <View style={styles.viewTrainsPrompt}>
+                <Text style={styles.promptTitle}>Key Trains at this Station</Text>
+              </View>
+            )}
+            {activeTab === 'Overview' && trains.slice(0, 4).map(t => (
+              <View key={t.trainNumber}>
+                {renderTrain({ item: t })}
+              </View>
+            ))}
           </View>
-          {station.zone && (
-            <View style={styles.infoRow}>
-              <Ionicons name="business-outline" size={14} color="#6B7280" />
-              <Text style={styles.infoText}>{station.zone} Railway Zone</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Section header */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionLabel}>TRAINS AT THIS STATION</Text>
-        {!loading && <Text style={styles.count}>{trains.length} trains</Text>}
-      </View>
-
-      {loading ? (
-        <Text style={styles.loadingText}>Loading trains...</Text>
-      ) : (
-        <FlatList
-          data={trains}
-          keyExtractor={t => t.id}
-          renderItem={renderTrain}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -151,143 +218,177 @@ export default StationDetailsScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FAF7F4',
   },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: 40,
-    color: '#6B7280',
-    fontSize: 15,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    gap: 8,
-  },
-  backBtn: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  goaTag: {
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  goaTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#1A73E8',
-    letterSpacing: 0.5,
-  },
-  mapBtn: {
-    padding: 6,
-    borderRadius: 10,
-    backgroundColor: '#EFF6FF',
-  },
-  stationInfo: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  sectionHeader: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 1,
-  },
-  count: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  listContent: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    paddingVertical: 4,
-  },
-  trainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
   },
-  arrivalTime: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    width: 52,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  typeBar: {
-    width: 3,
-    height: 38,
-    borderRadius: 2,
+  titleBlock: {
+    alignItems: 'center',
   },
-  trainBody: {
+  headerStationTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  headerStationSub: {
+    fontSize: 12,
+    color: '#8A7A71',
+    marginTop: 2,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEAE6',
+    paddingHorizontal: 16,
+    marginTop: 6,
+  },
+  tabBtn: {
     flex: 1,
-    gap: 3,
+    paddingVertical: 10,
+    alignItems: 'center',
   },
-  trainName: {
+  tabBtnActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#9E3C1B',
+  },
+  tabBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
+    color: '#8A7A71',
   },
-  trainRoute: {
-    fontSize: 11,
-    color: '#6B7280',
-  },
-  typeBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  typeBadgeText: {
-    fontSize: 10,
+  tabBtnTextActive: {
+    color: '#9E3C1B',
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
-  separator: {
-    height: 1,
-    backgroundColor: '#F9FAFB',
-    marginLeft: 82,
+  contentBody: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#6B584E',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    marginBottom: 14,
+  },
+  cardHeader: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2C201A',
+    marginBottom: 8,
+  },
+  aboutText: {
+    fontSize: 13,
+    color: '#554238',
+    lineHeight: 19,
+  },
+  popularRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F6F2EE',
+  },
+  popRouteText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2C201A',
+  },
+  popRouteCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8A7A71',
+  },
+  viewTrainsPrompt: {
+    marginVertical: 8,
+  },
+  promptTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  trainCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+  },
+  trainTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trainNumber: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  trainName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#382A22',
+    flex: 1,
+  },
+  routeText: {
+    fontSize: 13,
+    color: '#7A6B63',
+    marginVertical: 4,
+  },
+  timingRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 4,
+  },
+  timeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeTagLabel: {
+    fontSize: 12,
+    color: '#8A7A71',
+  },
+  timeTagVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2C201A',
   },
 });

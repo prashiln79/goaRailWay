@@ -4,104 +4,75 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapScreen from '../screens/MapScreen';
+
+import TrainsHomeScreen from '../screens/TrainsHomeScreen';
 import TrainDetailsScreen from '../screens/TrainDetailsScreen';
+import AvailabilityScreen from '../screens/AvailabilityScreen';
+import ConnectionsScreen from '../screens/ConnectionsScreen';
+import StationsListScreen from '../screens/StationsListScreen';
 import StationDetailsScreen from '../screens/StationDetailsScreen';
-import SearchScreen from '../screens/SearchScreen';
+import SavedScreen from '../screens/SavedScreen';
+import MoreScreen from '../screens/MoreScreen';
 
 export type RootStackParamList = {
-  Tabs: undefined;
-  MapScreen: undefined;
+  MainTabs: undefined;
   TrainDetails: { trainNumber: string };
+  Availability: { trainNumber: string; fromCode?: string; toCode?: string; date?: string };
   StationDetails: { stationCode: string };
-  Search: undefined;
+  Connections: undefined;
 };
 
 export type TabParamList = {
-  Map: undefined;
   Trains: undefined;
+  Connections: undefined;
   Stations: undefined;
-  Search: undefined;
+  Saved: undefined;
   More: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-/** Placeholder tab screens */
-const TrainsListPlaceholder = () => {
-  const MapScreenComp = MapScreen; // reuse map for now
-  return <MapScreenComp />;
-};
-
-function MapStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: '#F8F9FA' },
-        animationEnabled: true,
-      }}
-    >
-      <Stack.Screen name="MapScreen" component={MapScreen} />
-      <Stack.Screen
-        name="TrainDetails"
-        component={TrainDetailsScreen}
-        options={{ presentation: 'card', gestureEnabled: true }}
-      />
-      <Stack.Screen
-        name="StationDetails"
-        component={StationDetailsScreen}
-        options={{ presentation: 'card', gestureEnabled: true }}
-      />
-      <Stack.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{ presentation: 'modal', gestureEnabled: true }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-
 function BottomTabs() {
   const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
+      initialRouteName="Trains"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          height: 60 + insets.bottom,
+          borderTopColor: '#EFEAE6',
+          height: 62 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 6,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
         },
-        tabBarActiveTintColor: '#1A73E8',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: '#9E3C1B', // Terracotta accent matching the UI mockup
+        tabBarInactiveTintColor: '#A8998E',
         tabBarIcon: ({ focused, color, size }) => {
-          const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
-            Map: focused ? 'map' : 'map-outline',
-            Trains: focused ? 'train' : 'train-outline',
-            Stations: focused ? 'location' : 'location-outline',
-            Search: focused ? 'search' : 'search-outline',
-            More: focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline',
+          const icons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+            Trains: { active: 'train', inactive: 'train-outline' },
+            Connections: { active: 'git-branch', inactive: 'git-branch-outline' },
+            Stations: { active: 'location', inactive: 'location-outline' },
+            Saved: { active: 'bookmark', inactive: 'bookmark-outline' },
+            More: { active: 'ellipsis-horizontal', inactive: 'ellipsis-horizontal-outline' },
           };
-          return <Ionicons name={icons[route.name] ?? 'ellipsis-horizontal'} size={size} color={color} />;
+          const iconConfig = icons[route.name] ?? { active: 'ellipsis-horizontal', inactive: 'ellipsis-horizontal-outline' };
+          return <Ionicons name={focused ? iconConfig.active : iconConfig.inactive} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Map" component={MapStack} />
-      <Tab.Screen name="Trains" component={MapStack} />
-      <Tab.Screen name="Stations" component={MapStack} />
-      <Tab.Screen name="Search" component={SearchScreen} />
-      <Tab.Screen name="More" component={MapStack} />
+      <Tab.Screen name="Trains" component={TrainsHomeScreen} />
+      <Tab.Screen name="Connections" component={ConnectionsScreen} />
+      <Tab.Screen name="Stations" component={StationsListScreen} />
+      <Tab.Screen name="Saved" component={SavedScreen} />
+      <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );
 }
@@ -109,7 +80,35 @@ function BottomTabs() {
 const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
-      <BottomTabs />
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: '#FAF7F4' },
+          animationEnabled: true,
+        }}
+      >
+        <Stack.Screen name="MainTabs" component={BottomTabs} />
+        <Stack.Screen
+          name="TrainDetails"
+          component={TrainDetailsScreen}
+          options={{ presentation: 'card', gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="Availability"
+          component={AvailabilityScreen}
+          options={{ presentation: 'card', gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="StationDetails"
+          component={StationDetailsScreen}
+          options={{ presentation: 'card', gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="Connections"
+          component={ConnectionsScreen}
+          options={{ presentation: 'card', gestureEnabled: true }}
+        />
+      </Stack.Navigator>
     </NavigationContainer>
   );
 };

@@ -32,7 +32,7 @@ export const useTrainStore = create<TrainState>((set, get) => ({
     try {
       const trains = await trainService.getAllTrains();
       set({ allTrains: trains, filteredTrains: trains, isLoading: false });
-    } catch (e) {
+    } catch (_e) {
       set({ error: 'Failed to load trains', isLoading: false });
     }
   },

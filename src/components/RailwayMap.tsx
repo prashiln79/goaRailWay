@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Polyline, PROVIDER_DEFAULT, Region, UrlTile } from 'react-native-maps';
+import MapView, { Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { Station } from '../types/Station';
 import { Train } from '../types/Train';
 import { RailwayRoute } from '../types/RailwayRoute';
@@ -42,6 +42,80 @@ function buildTrainRouteCoords(
     .filter(Boolean)
     .map(s => ({ latitude: s!.latitude, longitude: s!.longitude }));
 }
+
+const LIGHT_MAP_STYLE = [
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#f5f5f5' }],
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#616161' }],
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#f5f5f5' }],
+  },
+  {
+    featureType: 'administrative.land_parcel',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#bdbdbd' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#eeeeee' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#757575' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#e5e8e8' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#9e9e9e' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#ffffff' }],
+  },
+  {
+    featureType: 'road.arterial',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#757575' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#dadada' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#616161' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#c9e2f4' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#9e9e9e' }],
+  },
+];
 
 const RailwayMap: React.FC<RailwayMapProps> = memo(
   ({
@@ -85,7 +159,7 @@ const RailwayMap: React.FC<RailwayMapProps> = memo(
         <MapView
           ref={mapRef}
           style={styles.map}
-          provider={PROVIDER_DEFAULT}
+          provider={PROVIDER_GOOGLE}
           initialRegion={initialRegion}
           onRegionChangeComplete={onRegionChange}
           showsUserLocation
@@ -93,6 +167,7 @@ const RailwayMap: React.FC<RailwayMapProps> = memo(
           showsCompass={false}
           showsScale={false}
           mapType="standard"
+          customMapStyle={LIGHT_MAP_STYLE}
           toolbarEnabled={false}
         >
           {/* ─── Railway infrastructure polylines ─── */}
@@ -167,9 +242,18 @@ export default RailwayMap;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    ...StyleSheet.absoluteFill,
+    zIndex: 1,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
+  },
+  polylineOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2,
+    width: '100%',
+    height: '100%',
   },
 });

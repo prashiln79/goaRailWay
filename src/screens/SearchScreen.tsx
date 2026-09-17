@@ -1,13 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  StatusBar,
-  Keyboard,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, Keyboard, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -19,12 +11,10 @@ import { stationService } from '../services/stationService';
 import { STATION_MAP } from '../data/stations';
 import { getTrainTypeColor } from '../components/TrainCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import SearchBar from '../components/SearchBar';
 import { useMapStore } from '../store/mapStore';
 import { useTrainStore } from '../store/trainStore';
-import { TextInput } from 'react-native';
 
-type SearchNavProp = StackNavigationProp<RootStackParamList, 'Search'>;
+type SearchNavProp = StackNavigationProp<RootStackParamList>;
 
 type SearchResultType = 'train' | 'station';
 
@@ -44,29 +34,32 @@ const SearchScreen: React.FC = () => {
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
+    let isCurrent = true;
     if (!query.trim()) {
-      setResults([]);
       return;
     }
-    const timer = setTimeout(async () => {
-      setSearching(true);
+    const timer = globalThis.setTimeout(async () => {
       const [trains, stations] = await Promise.all([
         trainService.searchTrains(query),
         stationService.searchStations(query),
       ]);
-      const trainResults: SearchResult[] = trains.map(t => ({ type: 'train', train: t }));
-      const stationResults: SearchResult[] = stations.map(s => ({ type: 'station', station: s }));
-      setResults([...stationResults, ...trainResults]);
-      setSearching(false);
+      if (isCurrent) {
+        const trainResults: SearchResult[] = trains.map(t => ({ type: 'train', train: t }));
+        const stationResults: SearchResult[] = stations.map(s => ({ type: 'station', station: s }));
+        setResults([...stationResults, ...trainResults]);
+      }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      isCurrent = false;
+      globalThis.clearTimeout(timer);
+    };
   }, [query]);
 
   const handleTrainResult = useCallback(
     (train: Train) => {
       Keyboard.dismiss();
       selectTrain(train);
-      navigation.navigate('MapScreen');
+      navigation.navigate('TrainDetails', { trainNumber: train.trainNumber });
     },
     [navigation, selectTrain],
   );
@@ -76,7 +69,7 @@ const SearchScreen: React.FC = () => {
       Keyboard.dismiss();
       focusStation(station);
       selectStation(station);
-      navigation.navigate('MapScreen');
+      navigation.navigate('StationDetails', { stationCode: station.code });
     },
     [navigation, focusStation, selectStation],
   );

@@ -4,87 +4,106 @@ import { Ionicons } from '@expo/vector-icons';
 import { Train } from '../types/Train';
 import { STATION_MAP } from '../data/stations';
 
+export function getTrainTypeColor(type: string): string {
+  const colors: Record<string, string> = {
+    Rajdhani: '#C62828',
+    VandeBharat: '#0D47A1',
+    Tejas: '#6A1B9A',
+    Express: '#9E3C1B',
+    Mail: '#E65100',
+    Passenger: '#2E7D32',
+    DEMU: '#2E7D32',
+  };
+  return colors[type] ?? '#9E3C1B';
+}
+
 interface TrainCardProps {
   train: Train;
-  isSelected: boolean;
+  isSelected?: boolean;
   onPress: (train: Train) => void;
+  selectedFrom?: string;
+  selectedTo?: string;
 }
 
-const TRAIN_TYPE_COLORS: Record<string, string> = {
-  Rajdhani: '#C62828',
-  VandeBharat: '#0D47A1',
-  Tejas: '#6A1B9A',
-  Express: '#1565C0',
-  Mail: '#E65100',
-  Passenger: '#2E7D32',
-  DEMU: '#2E7D32',
-};
+export const TrainCard: React.FC<TrainCardProps> = memo(({
+  train,
+  isSelected,
+  onPress,
+  selectedFrom,
+  selectedTo,
+}) => {
+  // Find matching stops for timing
+  const fromStop = train.stops.find(s => s.stationCode === selectedFrom) ?? train.stops[0];
+  const toStop = train.stops.find(s => s.stationCode === selectedTo) ?? train.stops[train.stops.length - 1];
 
-const TRAIN_TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  Rajdhani: 'flash',
-  VandeBharat: 'flash',
-  Tejas: 'flash',
-  Express: 'train',
-  Mail: 'train',
-  Passenger: 'train',
-  DEMU: 'train',
-};
+  const depTime = fromStop?.departureTime ?? '15:20';
+  const arrTime = toStop?.arrivalTime ?? toStop?.departureTime ?? '03:20';
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const fromName = (selectedFrom && STATION_MAP[selectedFrom]?.name) || STATION_MAP[train.sourceStationCode]?.name || train.sourceStationCode;
+  const toName = (selectedTo && STATION_MAP[selectedTo]?.name) || STATION_MAP[train.destinationStationCode]?.name || train.destinationStationCode;
 
-export function getTrainTypeColor(type: string): string {
-  return TRAIN_TYPE_COLORS[type] ?? '#1565C0';
-}
-
-const TrainCard: React.FC<TrainCardProps> = memo(({ train, isSelected, onPress }) => {
-  const color = getTrainTypeColor(train.type);
-  const srcStation = STATION_MAP[train.sourceStationCode];
-  const dstStation = STATION_MAP[train.destinationStationCode];
-  const icon = TRAIN_TYPE_ICONS[train.type] ?? 'train';
-
-  const runDays = train.runningDays
-    .map(d => DAYS[d])
-    .join(' ');
+  // Calculate Goa stops count
+  const goaStopsCount = train.stops.filter(s =>
+    ['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG', 'SVDEM', 'KULEM'].includes(s.stationCode),
+  ).length;
 
   return (
     <TouchableOpacity
       style={[styles.card, isSelected && styles.cardSelected]}
       onPress={() => onPress(train)}
-      activeOpacity={0.85}
+      activeOpacity={0.88}
     >
-      {/* Left color bar */}
-      <View style={[styles.colorBar, { backgroundColor: color }]} />
-
-      <View style={styles.body}>
-        {/* Header row */}
-        <View style={styles.headerRow}>
-          <View style={[styles.typeBadge, { backgroundColor: color + '18' }]}>
-            <Ionicons name={icon} size={11} color={color} />
-            <Text style={[styles.typeBadgeText, { color }]}>{train.type}</Text>
-          </View>
-          <Text style={styles.trainNumber}>#{train.trainNumber}</Text>
+      {/* Top Header: Train Number, Name and Chevron */}
+      <View style={styles.headerRow}>
+        <View style={styles.numberAndName}>
+          <Text style={styles.trainNumber}>{train.trainNumber}</Text>
+          <Text style={styles.trainName} numberOfLines={1}>{train.name}</Text>
         </View>
-
-        {/* Train name */}
-        <Text style={styles.trainName} numberOfLines={1}>
-          {train.name}
-        </Text>
-
-        {/* Route */}
-        <View style={styles.routeRow}>
-          <Ionicons name="location-outline" size={12} color="#6B7280" />
-          <Text style={styles.routeText} numberOfLines={1}>
-            {srcStation?.name ?? train.sourceStationCode}
-            <Text style={styles.routeArrow}> → </Text>
-            {dstStation?.name ?? train.destinationStationCode}
-          </Text>
-        </View>
-
-        {/* Running days */}
-        <Text style={styles.days}>{runDays}</Text>
+        <Ionicons name="chevron-forward" size={18} color="#A89D96" />
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color="#D1D5DB" style={styles.chevron} />
+      {/* Main Route & Timings */}
+      <View style={styles.timingSection}>
+        {/* Departure */}
+        <View style={styles.timeCol}>
+          <Text style={styles.timeText}>{depTime}</Text>
+          <Text style={styles.stationText} numberOfLines={1}>{fromName}</Text>
+        </View>
+
+        {/* Duration pill in middle */}
+        <View style={styles.durationCol}>
+          <Text style={styles.durationText}>7h 40m</Text>
+          <View style={styles.durationLine}>
+            <View style={styles.dot} />
+            <View style={styles.line} />
+            <Ionicons name="arrow-forward" size={14} color="#C4B7AF" style={styles.arrowIcon} />
+          </View>
+        </View>
+
+        {/* Arrival */}
+        <View style={[styles.timeCol, styles.timeColRight]}>
+          <Text style={styles.timeText}>{arrTime}</Text>
+          <Text style={[styles.stationText, styles.stationTextRight]} numberOfLines={1}>{toName}</Text>
+        </View>
+      </View>
+
+      {/* Badges Row */}
+      <View style={styles.badgesRow}>
+        <View style={styles.badgeGoa}>
+          <Ionicons name="leaf-outline" size={12} color="#8A4A1C" />
+          <Text style={styles.badgeGoaText}>{goaStopsCount > 0 ? `${goaStopsCount} Goa stops` : 'Direct to Goa'}</Text>
+        </View>
+
+        <View style={styles.badgeRuns}>
+          <Ionicons name="checkmark-circle" size={13} color="#1E824C" />
+          <Text style={styles.badgeRunsText}>Runs today</Text>
+        </View>
+
+        <View style={styles.badgeTatkal}>
+          <Ionicons name="ticket-outline" size={12} color="#C0392B" />
+          <Text style={styles.badgeTatkalText}>Tatkal</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -95,83 +114,150 @@ export default TrainCard;
 
 const styles = StyleSheet.create({
   card: {
-    width: 220,
-    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   cardSelected: {
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 6,
+    borderColor: '#9E3C1B',
     borderWidth: 1.5,
-    borderColor: '#1A73E8',
-  },
-  colorBar: {
-    width: 4,
-  },
-  body: {
-    flex: 1,
-    padding: 12,
-    gap: 4,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  typeBadge: {
+  numberAndName: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  typeBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    flex: 1,
+    marginRight: 8,
   },
   trainNumber: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2C201A',
+    marginRight: 8,
+    letterSpacing: 0.3,
   },
   trainName: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
-    letterSpacing: 0.1,
-  },
-  routeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  routeText: {
-    fontSize: 11,
-    color: '#6B7280',
+    color: '#382A22',
     flex: 1,
   },
-  routeArrow: {
-    color: '#9CA3AF',
+  timingSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 4,
   },
-  days: {
-    fontSize: 10,
-    color: '#9CA3AF',
+  timeCol: {
+    flex: 2,
+  },
+  timeColRight: {
+    alignItems: 'flex-end',
+  },
+  timeText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1613',
+  },
+  stationText: {
+    fontSize: 13,
+    color: '#7A6B63',
+    fontWeight: '500',
     marginTop: 2,
   },
-  chevron: {
-    alignSelf: 'center',
-    marginRight: 8,
+  stationTextRight: {
+    textAlign: 'right',
+  },
+  durationCol: {
+    flex: 1.8,
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  durationText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8A7A71',
+    marginBottom: 4,
+  },
+  durationLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#C4B7AF',
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#DFD7D1',
+  },
+  arrowIcon: {
+    marginLeft: -2,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    gap: 8,
+  },
+  badgeGoa: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7EEE7',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  badgeGoaText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8A4A1C',
+  },
+  badgeRuns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF7EE',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  badgeRunsText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E824C',
+  },
+  badgeTatkal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDEEEE',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  badgeTatkalText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#C0392B',
   },
 });

@@ -28,7 +28,7 @@ import StationBottomSheet from '../components/StationBottomSheet';
 import TrainBottomSheet from '../components/TrainBottomSheet';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
-type MapScreenNavProp = StackNavigationProp<RootStackParamList, 'MapScreen'>;
+type MapScreenNavProp = StackNavigationProp<RootStackParamList>;
 
 const MapScreen: React.FC = () => {
   const navigation = useNavigation<MapScreenNavProp>();
@@ -143,7 +143,7 @@ const MapScreen: React.FC = () => {
   );
 
   const handleSearchFocus = useCallback(() => {
-    navigation.navigate('Search');
+    (navigation as any).navigate('Search');
   }, [navigation]);
 
   const carouselRef = useRef<FlatList>(null);

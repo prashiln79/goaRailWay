@@ -1,6 +1,6 @@
-export type TrainType = 'Rajdhani' | 'VandeBharat' | 'Tejas' | 'Express' | 'Mail' | 'Passenger' | 'DEMU';
-
 import { TrainStop } from './TrainStop';
+
+export type TrainType = 'Rajdhani' | 'VandeBharat' | 'Tejas' | 'Express' | 'Mail' | 'Passenger' | 'DEMU';
 
 export interface Train {
   id: string;
