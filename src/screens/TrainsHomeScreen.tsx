@@ -27,18 +27,25 @@ import {
   HubStation,
   CorridorHub,
   CORRIDOR_HUBS,
+  GOA_STATION_CODES,
+  NEARBY_GOA_STATION_CODES,
 } from '../data/corridorHubs';
 import {
-  TimingFilter,
   SortType,
-  TIMING_FILTER_OPTIONS,
   SORT_OPTIONS,
   filterAndSortTrains,
   getContextualSegment,
 } from '../utils/trainFilterUtils';
 
 // Re-export domain types and constants for backward compatibility
-export { CorridorHubId, HubStation, CorridorHub, CORRIDOR_HUBS };
+export {
+  CorridorHubId,
+  HubStation,
+  CorridorHub,
+  CORRIDOR_HUBS,
+  GOA_STATION_CODES,
+  NEARBY_GOA_STATION_CODES,
+};
 
 type TrainsHomeNavProp = StackNavigationProp<RootStackParamList>;
 
@@ -55,7 +62,6 @@ export const TrainsHomeScreen: React.FC = () => {
   const [selectedStationCode, setSelectedStationCode] = useState<string | null>(
     selectedHub === 'Mumbai' ? 'ALL_MUMBAI' : 'ALL_GOA',
   );
-  const [timingFilter, setTimingFilter] = useState<TimingFilter>('All');
   const [sortOption, setSortOption] = useState<SortType>('Night journeys first');
 
   // Modals
@@ -117,10 +123,9 @@ export const TrainsHomeScreen: React.FC = () => {
     return filterAndSortTrains(allTrains, {
       selectedHub,
       selectedStationCode,
-      timingFilter,
       sortOption,
     });
-  }, [allTrains, selectedHub, selectedStationCode, timingFilter, sortOption]);
+  }, [allTrains, selectedHub, selectedStationCode, sortOption]);
 
   const headingTitle = useMemo(() => {
     if (activeStationObj && !activeStationObj.code.startsWith('ALL_')) {
@@ -140,12 +145,18 @@ export const TrainsHomeScreen: React.FC = () => {
   const renderExplorerCard = useCallback(
     (train: Train) => {
       const segment = getContextualSegment(train, selectedHub, selectedStationCode);
+      const isNearbyAlt =
+        selectedHub === 'Goa' &&
+        !train.stops.some(s => GOA_STATION_CODES.has(s.stationCode)) &&
+        train.stops.some(s => NEARBY_GOA_STATION_CODES.has(s.stationCode));
+
       return (
         <TrainCard
           key={train.trainNumber}
           train={train}
           onPress={handleTrainPress}
           segment={segment}
+          showAltNotice={isNearbyAlt}
         />
       );
     },
@@ -221,13 +232,9 @@ export const TrainsHomeScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Major Corridor Hub Chips */}
-            <View style={styles.chipsContainer}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryScroll}
-              >
+            {/* Top Filter Bar: Corridor Hubs & Sort Trigger */}
+            <View style={styles.topFilterBar}>
+              <View style={styles.hubChipsRow}>
                 {CORRIDOR_HUBS.map(hub => {
                   const isActive = selectedHub === hub.id;
                   return (
@@ -254,7 +261,24 @@ export const TrainsHomeScreen: React.FC = () => {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+              </View>
+
+              <TouchableOpacity
+                style={styles.topSortBtn}
+                onPress={() => setSortModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="swap-vertical" size={13} color="#9E3C1B" />
+                <Text style={styles.topSortText} numberOfLines={1}>
+                  {sortOption === 'Night journeys first'
+                    ? 'Night first'
+                    : sortOption === 'Departure time'
+                    ? 'Departure'
+                    : sortOption === 'Arrival time'
+                    ? 'Arrival'
+                    : 'Duration'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Dynamic Station Sub-Menu (Appears when a Hub is selected) */}
@@ -312,48 +336,6 @@ export const TrainsHomeScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Timing Sort & Filter Chips */}
-            <View style={styles.timingSection}>
-              <View style={styles.timingHeaderRow}>
-                <Text style={styles.sectionOverline}>DEPARTURE TIME</Text>
-                <TouchableOpacity
-                  style={styles.sortTriggerBtn}
-                  onPress={() => setSortModalVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="swap-vertical" size={13} color="#9E3C1B" />
-                  <Text style={styles.sortTriggerText}>Sort: {sortOption}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.timingScroll}
-              >
-                {TIMING_FILTER_OPTIONS.map(t => {
-                  const isActive = timingFilter === t.id;
-                  return (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[styles.timingChip, isActive && styles.timingChipActive]}
-                      onPress={() => setTimingFilter(t.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Text
-                        style={[
-                          styles.timingChipText,
-                          isActive && styles.timingChipTextActive,
-                        ]}
-                      >
-                        {t.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
             {/* Section Divider & All Trains Header */}
             <View style={styles.allTrainsHeadingRow}>
               <Text style={styles.sectionTitle}>{headingTitle}</Text>
@@ -365,7 +347,7 @@ export const TrainsHomeScreen: React.FC = () => {
           <View style={styles.emptyState}>
             <Ionicons name="train-outline" size={44} color="#A8998E" />
             <Text style={styles.emptyTitle}>No trains matching filters</Text>
-            <Text style={styles.emptySubtitle}>Try changing the timing filter or category</Text>
+            <Text style={styles.emptySubtitle}>Try choosing another station or corridor</Text>
           </View>
         }
       />
@@ -555,11 +537,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // ── Corridor Hub Chips ───────────────────────────────────────────
-  chipsContainer: {
+  // ── Top Filter Bar (Hubs & Sort) ─────────────────────────────────
+  topFilterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  categoryScroll: {
+  hubChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   categoryChip: {
@@ -584,6 +571,22 @@ const styles = StyleSheet.create({
   categoryChipTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  topSortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    gap: 5,
+  },
+  topSortText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9E3C1B',
   },
 
   // ── Dynamic Station Sub-menu ─────────────────────────────────────
@@ -654,56 +657,6 @@ const styles = StyleSheet.create({
   },
   stationTagBadgeTextActive: {
     color: '#FDEEE9',
-  },
-
-  // ── Timing Section & Sort Trigger ────────────────────────────────
-  timingSection: {
-    marginBottom: 16,
-  },
-  timingHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  sectionOverline: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#8A7A70',
-    letterSpacing: 0.8,
-  },
-  sortTriggerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sortTriggerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9E3C1B',
-  },
-  timingScroll: {
-    gap: 6,
-  },
-  timingChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#F5F0EB',
-  },
-  timingChipActive: {
-    backgroundColor: '#FCEFE9',
-    borderWidth: 1,
-    borderColor: '#9E3C1B',
-  },
-  timingChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5C4E46',
-  },
-  timingChipTextActive: {
-    color: '#9E3C1B',
-    fontWeight: '700',
   },
 
   // ── Section Title & List Feed ────────────────────────────────────

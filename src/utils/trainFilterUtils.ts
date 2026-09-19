@@ -3,6 +3,8 @@ import { STATION_MAP } from '../data/stations';
 import {
   CorridorHubId,
   GOA_STATION_CODES,
+  NEARBY_GOA_STATION_CODES,
+  GOA_AND_NEARBY_CODES,
   SWV_STATION_CODES,
   RN_STATION_CODES,
   MUMBAI_STATION_CODES,
@@ -53,7 +55,7 @@ export function getDepTime(train: Train): string {
 interface FilterAndSortOptions {
   selectedHub: CorridorHubId;
   selectedStationCode: string | null;
-  timingFilter: TimingFilter;
+  timingFilter?: TimingFilter;
   sortOption: SortType;
 }
 
@@ -69,13 +71,13 @@ export function filterAndSortTrains(
   // 1. Hub / Station Selection Filter — with directional logic for terminal hubs
   if (selectedHub === 'Goa') {
     if (selectedStationCode && selectedStationCode !== 'ALL_GOA') {
-      // Filter trains that stop at the specific Goa station AND are traveling TOWARD Goa
-      // (i.e., a Mumbai/Konkan stop appears before the Goa stop in the stops sequence)
+      // Filter trains that stop at the specific station AND are traveling TOWARD Goa / Konkan
+      // (i.e., a Mumbai/Konkan stop appears before the target stop in the stops sequence)
       list = list.filter(t => {
-        const goaIdx = stopIndex(t, selectedStationCode);
-        if (goaIdx === -1) return false;
-        const northBeforeGoa = t.stops
-          .slice(0, goaIdx)
+        const targetIdx = stopIndex(t, selectedStationCode);
+        if (targetIdx === -1) return false;
+        const northBeforeTarget = t.stops
+          .slice(0, targetIdx)
           .some(
             s =>
               MUMBAI_STATION_CODES.has(s.stationCode) ||
@@ -83,18 +85,18 @@ export function filterAndSortTrains(
               RN_STATION_CODES.has(s.stationCode),
           );
         return (
-          northBeforeGoa ||
+          northBeforeTarget ||
           MUMBAI_STATION_CODES.has(t.sourceStationCode) ||
           RN_STATION_CODES.has(t.sourceStationCode)
         );
       });
     } else {
-      // All Goa — trains that are heading toward or terminating in Goa (from Mumbai/Konkan)
+      // All Goa & Nearby — trains heading toward Goa OR nearby alternative stations (Sawantwadi, Kudal, Karwar)
       list = list.filter(t => {
-        const firstGoaIdx = firstMatchIndex(t, GOA_STATION_CODES);
-        if (firstGoaIdx === -1) return false;
-        const northBeforeGoa = t.stops
-          .slice(0, firstGoaIdx)
+        const firstTargetIdx = firstMatchIndex(t, GOA_AND_NEARBY_CODES);
+        if (firstTargetIdx === -1) return false;
+        const northBeforeTarget = t.stops
+          .slice(0, firstTargetIdx)
           .some(
             s =>
               MUMBAI_STATION_CODES.has(s.stationCode) ||
@@ -104,7 +106,7 @@ export function filterAndSortTrains(
         const originatesNorth =
           MUMBAI_STATION_CODES.has(t.sourceStationCode) ||
           RN_STATION_CODES.has(t.sourceStationCode);
-        return northBeforeGoa || originatesNorth;
+        return northBeforeTarget || originatesNorth;
       });
     }
   } else if (selectedHub === 'Sawantwadi') {
@@ -141,7 +143,7 @@ export function filterAndSortTrains(
   }
 
   // 2. Timing Filter
-  if (timingFilter !== 'All') {
+  if (timingFilter && timingFilter !== 'All') {
     list = list.filter(t => {
       const depTime = getDepTime(t);
       const hour = parseInt(depTime.split(':')[0] || '12', 10);
@@ -257,14 +259,24 @@ export function getContextualSegment(
     if (selectedStationCode && selectedStationCode !== 'ALL_GOA') {
       toStop = train.stops.find(s => s.stationCode === selectedStationCode);
     } else {
-      // For ALL_GOA: if train terminates in Goa, use its destination stop (e.g. MAO or VSG)
+      // For ALL_GOA:
+      // 1. If train terminates in Goa, use its destination stop (e.g. MAO or VSG)
       if (GOA_STATION_CODES.has(train.destinationStationCode)) {
         toStop = train.stops.find(s => s.stationCode === train.destinationStationCode);
       } else {
-        // Otherwise prefer MAO (Madgaon Jn) or the last Goa stop on this train
+        // 2. Otherwise prefer MAO (Madgaon Jn) or the last Goa stop on this train
         toStop =
           train.stops.find(s => s.stationCode === 'MAO') ??
           [...train.stops].reverse().find(s => GOA_STATION_CODES.has(s.stationCode));
+      }
+
+      // 3. If train doesn't stop inside Goa, check for nearby destination (e.g. Sawantwadi Road SWV or Karwar KAWR)
+      if (!toStop) {
+        if (NEARBY_GOA_STATION_CODES.has(train.destinationStationCode)) {
+          toStop = train.stops.find(s => s.stationCode === train.destinationStationCode);
+        } else {
+          toStop = [...train.stops].reverse().find(s => NEARBY_GOA_STATION_CODES.has(s.stationCode));
+        }
       }
     }
 
@@ -273,6 +285,10 @@ export function getContextualSegment(
     // The segment starts from train's origin stop (Mumbai/Konkan side)
     const fromStop = train.stops[0];
     if (!fromStop || fromStop.stationCode === toStop.stationCode) return null;
+
+    const isNearbyTerminus =
+      !GOA_STATION_CODES.has(toStop.stationCode) &&
+      NEARBY_GOA_STATION_CODES.has(toStop.stationCode);
 
     return {
       fromCode: fromStop.stationCode,
@@ -283,9 +299,9 @@ export function getContextualSegment(
       toName: STATION_MAP[toStop.stationCode]?.name ?? toStop.stationCode,
       toTime: toStop.arrivalTime ?? toStop.departureTime ?? '',
       toDay: toStop.dayOffset ?? 0,
-      direction: '→ Goa',
-      directionColor: '#2E7D32',
-      directionBg: '#EBF5EB',
+      direction: isNearbyTerminus ? ('→ Nearby' as const) : ('→ Goa' as const),
+      directionColor: isNearbyTerminus ? '#D97706' : '#2E7D32',
+      directionBg: isNearbyTerminus ? '#FEF3C7' : '#EBF5EB',
     };
   }
 

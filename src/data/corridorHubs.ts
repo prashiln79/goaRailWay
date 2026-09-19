@@ -24,13 +24,16 @@ export const CORRIDOR_HUBS: CorridorHub[] = [
     icon: 'sunny-outline',
     description: 'Stations across North, Central & South Goa',
     stations: [
-      { code: 'ALL_GOA', name: 'All Goa Stations', shortName: 'All Goa' },
+      { code: 'ALL_GOA', name: 'All Goa & Nearby', shortName: 'All (+ Nearby)' },
       { code: 'THVM', name: 'Thivim', shortName: 'Thivim', tag: 'North' },
       { code: 'KRMI', name: 'Karmali', shortName: 'Karmali', tag: 'Panaji' },
       { code: 'MAO', name: 'Madgaon', shortName: 'Madgaon', tag: 'South' },
       { code: 'CNO', name: 'Canacona', shortName: 'Canacona', tag: 'South' },
       { code: 'VSG', name: 'Vasco da Gama', shortName: 'Vasco', tag: 'Port' },
       { code: 'PER', name: 'Pernem', shortName: 'Pernem', tag: 'North' },
+      { code: 'SWV', name: 'Sawantwadi Road', shortName: 'Sawantwadi', tag: '38 km' },
+      { code: 'KUDL', name: 'Kudal', shortName: 'Kudal', tag: '60 km' },
+      { code: 'KAWR', name: 'Karwar', shortName: 'Karwar', tag: '34 km' },
     ],
   },
   {
@@ -78,6 +81,12 @@ export const EXTENDED_CORRIDOR_HUBS: CorridorHub[] = [
 ];
 
 export const GOA_STATION_CODES = new Set(['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG']);
+export const NEARBY_GOA_STATION_CODES = new Set(['SWV', 'KUDL', 'KKW', 'KAWR']);
+export const GOA_AND_NEARBY_CODES = new Set([
+  ...Array.from(GOA_STATION_CODES),
+  ...Array.from(NEARBY_GOA_STATION_CODES),
+]);
+
 export const SWV_STATION_CODES = new Set(['SWV', 'KUDL', 'KKW']);
 export const RN_STATION_CODES = new Set(['RN', 'CHI', 'ROHA', 'MNDA']);
 export const MUMBAI_STATION_CODES = new Set(['CSMT', 'LTT', 'DR', 'PNVL', 'DIV', 'BCT', 'BDTS']);
