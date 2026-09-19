@@ -18,7 +18,6 @@ import { Train } from '../types/Train';
 import { trainService } from '../services/trainService';
 import { TrainCard } from '../components/TrainCard';
 import { SearchJourneyModal } from '../components/SearchJourneyModal';
-import DateSelector from '../components/DateSelector';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useCorridorStore } from '../store/corridorStore';
 
@@ -49,13 +48,26 @@ export {
 
 type TrainsHomeNavProp = StackNavigationProp<RootStackParamList>;
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export const TrainsHomeScreen: React.FC = () => {
   const navigation = useNavigation<TrainsHomeNavProp>();
   const insets = useSafeAreaInsets();
 
   // ── State ────────────────────────────────────────────────────────
   const [allTrains, setAllTrains] = useState<Train[]>([]);
-  const [selectedDate, setSelectedDate] = useState('2026-09-17');
+
+  // 60-Day Advance Reservation Period (ARP) Date
+  const bookingDateInfo = useMemo(() => {
+    const target = new Date();
+    target.setDate(target.getDate() + 60);
+    const day = target.getDate();
+    const month = MONTH_NAMES[target.getMonth()];
+    const dayName = DAY_NAMES[target.getDay()];
+    const year = target.getFullYear();
+    return `${day} ${month} ${year} (${dayName})`;
+  }, []);
 
   // Filters & Sorting: Major Corridor Hubs + Dynamic Station Sub-menu
   const { selectedHub, setSelectedHub } = useCorridorStore();
@@ -66,7 +78,6 @@ export const TrainsHomeScreen: React.FC = () => {
 
   // Modals
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [dateModalVisible, setDateModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
 
   // ── Data Loading ─────────────────────────────────────────────────
@@ -143,7 +154,7 @@ export const TrainsHomeScreen: React.FC = () => {
 
   // ── Train Card Renderer ──────────────────────────────────────────
   const renderExplorerCard = useCallback(
-    (train: Train) => {
+    (train: Train, index?: number) => {
       const segment = getContextualSegment(train, selectedHub, selectedStationCode);
       const isNearbyAlt =
         selectedHub === 'Goa' &&
@@ -154,6 +165,7 @@ export const TrainsHomeScreen: React.FC = () => {
         <TrainCard
           key={train.trainNumber}
           train={train}
+          index={index}
           onPress={handleTrainPress}
           segment={segment}
           showAltNotice={isNearbyAlt}
@@ -171,11 +183,15 @@ export const TrainsHomeScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerTitles}>
           <Text style={styles.appName}>Konkan Train Planner</Text>
-          <Text style={styles.appTagline}>Explore Konkan trains</Text>
-          <Text style={styles.appSubTagline}>Mumbai • Konkan • Goa</Text>
+          <View style={styles.bookingBadge}>
+            <Ionicons name="calendar-outline" size={11} color="#9E3C1B" />
+            <Text style={styles.bookingBadgeText}>
+              60-day booking: <Text style={styles.bookingBadgeDate}>{bookingDateInfo}</Text>
+            </Text>
+          </View>
         </View>
         <View style={styles.headerIconBox}>
-          <Ionicons name="train" size={26} color="#9E3C1B" />
+          <Ionicons name="train" size={20} color="#9E3C1B" />
         </View>
       </View>
 
@@ -202,35 +218,6 @@ export const TrainsHomeScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Compact Date Control */}
-            <View style={styles.dateBar}>
-              <View style={styles.dateLeft}>
-                <Text style={styles.dateOverline}>TODAY</Text>
-                <Text style={styles.dateTitle}>17 Sep 2026</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.datePickerBtn}
-                onPress={() => setDateModalVisible(prev => !prev)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={16} color="#9E3C1B" />
-                <Text style={styles.datePickerBtnText}>Select Date</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Expandable Date Selector */}
-            {dateModalVisible && (
-              <View style={styles.dateSelectorWrap}>
-                <DateSelector
-                  selectedDate={selectedDate}
-                  onSelectDate={d => {
-                    setSelectedDate(d);
-                    setDateModalVisible(false);
-                  }}
-                  onOpenCalendar={() => {}}
-                />
-              </View>
-            )}
 
             {/* Top Filter Bar: Corridor Hubs & Sort Trigger */}
             <View style={styles.topFilterBar}>
@@ -342,7 +329,7 @@ export const TrainsHomeScreen: React.FC = () => {
             </View>
           </View>
         }
-        renderItem={({ item }) => renderExplorerCard(item)}
+        renderItem={({ item, index }) => renderExplorerCard(item, index)}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="train-outline" size={44} color="#A8998E" />
@@ -419,34 +406,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 14,
+    paddingTop: 6,
+    paddingBottom: 8,
     backgroundColor: '#FAF7F4',
   },
   headerTitles: {
     flex: 1,
+    justifyContent: 'center',
   },
   appName: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#2C201A',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
-  appTagline: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9E3C1B',
-    marginTop: 2,
+  bookingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F7EFE8',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 3,
+    gap: 4,
   },
-  appSubTagline: {
-    fontSize: 12,
+  bookingBadgeText: {
+    fontSize: 11,
     color: '#7A6B63',
-    marginTop: 1,
+    fontWeight: '500',
+  },
+  bookingBadgeDate: {
+    color: '#9E3C1B',
+    fontWeight: '700',
   },
   headerIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#F7EFE8',
     alignItems: 'center',
     justifyContent: 'center',
@@ -493,49 +490,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Date Control ─────────────────────────────────────────────────
-  dateBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#EFEAE6',
-    marginBottom: 12,
-  },
-  dateLeft: {},
-  dateOverline: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#9E3C1B',
-    letterSpacing: 0.8,
-  },
-  dateTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2C201A',
-    marginTop: 1,
-  },
-  datePickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FCEFE9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 6,
-  },
-  datePickerBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9E3C1B',
-  },
-  dateSelectorWrap: {
-    marginBottom: 12,
-  },
 
   // ── Top Filter Bar (Hubs & Sort) ─────────────────────────────────
   topFilterBar: {

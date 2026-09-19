@@ -35,6 +35,7 @@ export interface TrainCardSegment {
 interface TrainCardProps {
   train: Train;
   onPress: (train: Train) => void;
+  index?: number;
 
   // ── Journey search context (optional) ──
   isSelected?: boolean;
@@ -57,6 +58,7 @@ interface TrainCardProps {
 export const TrainCard: React.FC<TrainCardProps> = memo(({
   train,
   onPress,
+  index,
   isSelected,
   selectedFrom,
   selectedTo,
@@ -132,16 +134,6 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         ? { label: '🌅 Evening', bg: '#FFEDD5', text: '#9A3412' }
         : { label: '🌙 Night', bg: '#EDE9FE', text: '#5B21B6' };
 
-  // ── Running days ─────────────────────────────────────────────────────────
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const runsText = train.runningDays.length === 7
-    ? 'Runs daily'
-    : train.runningDays.length === 6 && !train.runningDays.includes(0)
-      ? 'Mon – Sat'
-      : train.runningDays.length <= 3
-        ? `Runs: ${train.runningDays.map(d => DAY_NAMES[d]).join(', ')}`
-        : `${train.runningDays.length} days/week`;
-
   // ── Goa stops count ──────────────────────────────────────────────────────
   const goaStopsCount = train.stops.filter(s =>
     ['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG', 'SVDEM', 'KULEM'].includes(s.stationCode),
@@ -150,11 +142,13 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
   const isAlternative = destinationType === 'NEARBY';
   // Whether we are in the explorer (home) context
   const isExplorer = segment !== undefined;
+  const isOddRow = index !== undefined && index % 2 === 1;
 
   return (
     <TouchableOpacity
       style={[
         styles.card,
+        isOddRow && styles.cardOdd,
         isSelected && styles.cardSelected,
         isAlternative && !isExplorer && styles.cardAlternative,
         showAltNotice && styles.cardAlt,
@@ -162,54 +156,56 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
       onPress={() => onPress(train)}
       activeOpacity={0.88}
     >
-      {/* ── Header: Train Number + Name ── */}
+      {/* ── Header: Train Name, Number Badge & Journey Type ── */}
       <View style={styles.headerRow}>
-        <View style={styles.numberAndName}>
-          <Text style={styles.trainNumber}>{train.trainNumber}</Text>
-          <Text style={styles.trainName} numberOfLines={1}>{train.name}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#A89D96" />
-      </View>
-
-      {/* ── Route subtitle & Journey Type (Consistent across all tabs) ── */}
-      <View style={styles.routeAndTypeRow}>
-        <View style={styles.routeWithTag}>
-          <Text style={styles.routeSubtitle} numberOfLines={1}>
-            {fromName} → {toName}
+        <View style={styles.nameBlock}>
+          <Text style={styles.trainName} numberOfLines={1}>
+            {train.name}
           </Text>
-          {/* {isDirectionalSegment && (
-            <View style={[styles.directionChip, { backgroundColor: segment.directionBg }]}>
-              <Ionicons
-                name={segment.direction === '→ Mumbai' ? 'business-outline' : 'sunny-outline'}
-                size={10}
-                color={segment.directionColor}
-              />
-              <Text style={[styles.directionChipText, { color: segment.directionColor }]}>
-                {segment.direction}
-              </Text>
-            </View>
-          )} */}
-        </View>
-        <View style={[styles.badgeJourneyType, { backgroundColor: journeyType.bg }]}>
-          <Text style={[styles.badgeJourneyTypeText, { color: journeyType.text }]} numberOfLines={1}>
-            {journeyType.label}
-          </Text>
-        </View>
-      </View>
-
-      {/* ── Main Timings & Duration Row (Consistent across all tabs) ── */}
-      <View style={styles.timingSection}>
-        <Text style={styles.timeText}>{depTime}</Text>
-        <View style={styles.durationTrack}>
-          <View style={styles.trackLine} />
-          <View style={styles.durationPill}>
-            <Text style={styles.durationText}>{computedDur}</Text>
+          <View style={[styles.numberBadge, isOddRow && styles.numberBadgeOdd]}>
+            <Text style={styles.trainNumber}>{train.trainNumber}</Text>
           </View>
         </View>
-        <View style={styles.arrCol}>
+        <View style={styles.headerRight}>
+          <View style={[styles.badgeJourneyType, { backgroundColor: journeyType.bg }]}>
+            <Text style={[styles.badgeJourneyTypeText, { color: journeyType.text }]} numberOfLines={1}>
+              {journeyType.label}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={15} color="#A89D96" />
+        </View>
+      </View>
+
+      {/* ── Journey & Timing Section: Departure (Left) · Duration Track (Center) · Arrival (Right) ── */}
+      <View style={styles.journeySection}>
+        {/* Departure Endpoint */}
+        <View style={styles.timeEndpoint}>
+          <Text style={styles.timeText}>{depTime}</Text>
+          <Text style={styles.stationText} numberOfLines={1}>
+            {fromName}
+          </Text>
+        </View>
+
+        {/* Center Duration Track */}
+        <View style={styles.durationCenter}>
+          <Text style={styles.durationLabel}>{computedDur}</Text>
+          <View style={styles.trackLineContainer}>
+            <View style={[styles.trackLine, isOddRow && styles.trackLineOdd]} />
+            <Ionicons name="arrow-forward" size={11} color="#9E3C1B" style={styles.trackArrow} />
+          </View>
+          {!isAlternative && goaStopsCount > 0 && !isExplorer && (
+            <Text style={styles.goaStopsLabel}>{goaStopsCount} Goa stops</Text>
+          )}
+        </View>
+
+        {/* Arrival Endpoint */}
+        <View style={[styles.timeEndpoint, styles.timeEndpointRight]}>
           <Text style={styles.timeText}>
             {arrTime}
-            {dayOffset > 0 && <Text style={styles.dayOffsetSub}> +{dayOffset}</Text>}
+            {dayOffset > 0 && <Text style={styles.dayOffsetBadge}> +{dayOffset}</Text>}
+          </Text>
+          <Text style={[styles.stationText, styles.stationTextRight]} numberOfLines={1}>
+            {toName}
           </Text>
         </View>
       </View>
@@ -217,13 +213,10 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
       {/* ── Halt Banner (Sawantwadi / Ratnagiri specific station) ── */}
       {segment && segment.direction === 'Halt' && (
         <View style={styles.haltBanner}>
-          <Ionicons name="pin" size={13} color="#9E3C1B" />
-          <Text style={styles.haltBannerText}>
-            Halt at {segment.fromName}:{' '}
-            <Text style={styles.haltBold}>Arr {segment.fromTime}</Text>
-            {segment.toTime && segment.toTime !== segment.fromTime && (
-              <Text style={styles.haltBold}> · Dep {segment.toTime}</Text>
-            )}
+          <Ionicons name="pin" size={12} color="#9E3C1B" />
+          <Text style={styles.haltBannerText} numberOfLines={1}>
+            Halt at {segment.fromName}: Arr {segment.fromTime}
+            {segment.toTime && segment.toTime !== segment.fromTime ? ` · Dep ${segment.toTime}` : ''}
           </Text>
         </View>
       )}
@@ -231,14 +224,16 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
       {/* ── Alternative / Goa notices (explorer All-trains view) ── */}
       {showAltNotice && (
         <View style={styles.altNotice}>
-          <Ionicons name="navigate-outline" size={12} color="#D97706" />
-          <Text style={styles.altNoticeText}>Terminates at Sawantwadi Road (38 km from North Goa)</Text>
+          <Ionicons name="navigate-outline" size={11} color="#D97706" />
+          <Text style={styles.altNoticeText} numberOfLines={1}>
+            Terminates at Sawantwadi Road (38 km from North Goa)
+          </Text>
         </View>
       )}
       {showGoaNotice && (
         <View style={styles.goaNotice}>
-          <Ionicons name="checkmark-circle-outline" size={12} color="#2E7D32" />
-          <Text style={styles.goaNoticeText}>Direct Goa train with scheduled halts</Text>
+          <Ionicons name="checkmark-circle-outline" size={11} color="#2E7D32" />
+          <Text style={styles.goaNoticeText} numberOfLines={1}>Direct Goa train with scheduled halts</Text>
         </View>
       )}
 
@@ -247,7 +242,7 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         <View style={styles.altExplanationBox}>
           <View style={styles.altBadgeRow}>
             <View style={styles.altBadge}>
-              <Ionicons name="navigate-outline" size={12} color="#D97706" />
+              <Ionicons name="navigate-outline" size={11} color="#D97706" />
               <Text style={styles.altBadgeText}>Alternative station</Text>
             </View>
             {distanceLabel && (
@@ -255,8 +250,7 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
             )}
           </View>
           <View style={styles.transitHintRow}>
-            <Text style={styles.transitHint}>🚆 Train available to {toName}</Text>
-            <Text style={styles.transitRoadHint}>🚌 {roadTravelTip ?? 'Continue to Goa by road'}</Text>
+            <Text style={styles.transitHint}>🚆 Train to {toName} · 🚌 {roadTravelTip ?? 'Road to Goa'}</Text>
           </View>
         </View>
       )}
@@ -265,25 +259,11 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
       {!isExplorer && !isAlternative && (
         <View style={styles.goaStationPillRow}>
           <View style={styles.goaStationPill}>
-            <Ionicons name="location" size={12} color="#1E824C" />
+            <Ionicons name="location" size={11} color="#1E824C" />
             <Text style={styles.goaStationPillText}>{toName} · Goa station</Text>
           </View>
         </View>
       )}
-
-      {/* ── Footer: Running days + Goa stops ── */}
-      <View style={styles.badgesRow}>
-        {!isAlternative && goaStopsCount > 0 && !isExplorer && (
-          <View style={styles.badgeGoa}>
-            <Ionicons name="leaf-outline" size={12} color="#8A4A1C" />
-            <Text style={styles.badgeGoaText}>{goaStopsCount} Goa stops</Text>
-          </View>
-        )}
-        <View style={styles.badgeRuns}>
-          <Ionicons name="calendar-outline" size={12} color="#1E824C" />
-          <Text style={styles.badgeRunsText}>{runsText}</Text>
-        </View>
-      </View>
     </TouchableOpacity>
   );
 });
@@ -295,16 +275,21 @@ export default TrainCard;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 13,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#EFEAE6',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1.5 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
-    shadowRadius: 3,
+    shadowRadius: 2,
     elevation: 1,
+  },
+  cardOdd: {
+    backgroundColor: '#F5ECE3',
+    borderColor: '#E7DDD1',
   },
   cardSelected: {
     borderColor: '#9E3C1B',
@@ -318,75 +303,129 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3.5,
     borderLeftColor: '#D97706',
   },
+
+  // ── Header: Train Name & Number ──────────────────────────────────────────
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  numberAndName: {
+  nameBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
     marginRight: 8,
-  },
-  trainNumber: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#2C201A',
-    marginRight: 8,
-    letterSpacing: 0.3,
   },
   trainName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#382A22',
-    flex: 1,
-  },
-  routeAndTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 8,
-  },
-  routeWithTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 6,
-    marginRight: 8,
-  },
-  routeSubtitle: {
-    fontSize: 13,
-    color: '#7A6B63',
-    fontWeight: '600',
+    color: '#2C201A',
     flexShrink: 1,
   },
-  directionChip: {
+  numberBadge: {
+    backgroundColor: '#F5EFEA',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    marginLeft: 6,
+    flexShrink: 0,
+  },
+  numberBadgeOdd: {
+    backgroundColor: '#FFFFFF',
+  },
+  trainNumber: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#7A6B63',
+    letterSpacing: 0.2,
+  },
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 3,
-  },
-  directionChipText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    gap: 6,
+    flexShrink: 0,
   },
   badgeJourneyType: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 5,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeJourneyTypeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // ── Journey & Timings Section ────────────────────────────────────────────
+  journeySection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeEndpoint: {
+    flex: 1,
+    maxWidth: '36%',
+  },
+  timeEndpointRight: {
+    alignItems: 'flex-end',
+  },
+  timeText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#2C201A',
+    letterSpacing: -0.3,
+  },
+  dayOffsetBadge: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#B45309',
+  },
+  stationText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#7A6B63',
+    marginTop: 2,
+  },
+  stationTextRight: {
+    textAlign: 'right',
+  },
+  durationCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  durationLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8A7A70',
+    marginBottom: 3,
+  },
+  trackLineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  trackLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: '#E8DED6',
+  },
+  trackLineOdd: {
+    backgroundColor: '#DDCFBF',
+  },
+  trackArrow: {
+    marginLeft: -4,
+  },
+  goaStopsLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#8A4A1C',
+    marginTop: 3,
   },
 
   // ── Halt Banner ───────────────────────────────────────────────────────────
@@ -396,69 +435,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDF4F0',
     borderWidth: 1,
     borderColor: '#F2D7CD',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 6,
-    marginBottom: 10,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 5,
+    marginTop: 6,
   },
   haltBannerText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#5C4E46',
     flex: 1,
   },
   haltBold: {
     fontWeight: '800',
     color: '#9E3C1B',
-  },
-
-  // ── Timing Row ────────────────────────────────────────────────────────────
-  timingSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  timeText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1C1613',
-  },
-  arrCol: {
-    alignItems: 'flex-end',
-  },
-  dayOffsetSub: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  durationTrack: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginHorizontal: 12,
-  },
-  trackLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1.5,
-    backgroundColor: '#E5DDD7',
-  },
-  durationPill: {
-    backgroundColor: '#FAF7F4',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EFE7E1',
-    zIndex: 2,
-  },
-  durationText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#7A6B63',
   },
 
   // ── Explorer notices ──────────────────────────────────────────────────────
@@ -566,40 +556,4 @@ const styles = StyleSheet.create({
     color: '#1E824C',
   },
 
-  // ── Footer badges ─────────────────────────────────────────────────────────
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 8,
-  },
-  badgeGoa: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F7EEE7',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  badgeGoaText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#8A4A1C',
-  },
-  badgeRuns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EBF7EE',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  badgeRunsText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#1E824C',
-  },
 });
