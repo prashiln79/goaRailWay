@@ -7,6 +7,16 @@ export interface GoaStationInfo {
   roadAccess?: string;
 }
 
+export interface MumbaiStationInfo {
+  code: string;
+  name: string;
+  area: string;
+  type: 'Terminus' | 'Junction' | 'Transit Hub';
+  tagline: string;
+  nearbyDestinations?: string;
+  transitAccess?: string;
+}
+
 export interface NearbyAlternativeStationInfo {
   code: string;
   name: string;
@@ -140,5 +150,53 @@ export const NEARBY_ALTERNATIVE_STATIONS_DATA: NearbyAlternativeStationInfo[] = 
     group: 'NEARBY FOR SOUTH GOA',
     roadTravelTime: '~45 min by road',
     roadTip: 'Useful alternative for South Goa via road or bus connection.',
+  },
+];
+
+export const MUMBAI_STATIONS_DATA: MumbaiStationInfo[] = [
+  {
+    code: 'CSMT',
+    name: 'Mumbai CSMT',
+    area: 'South Mumbai',
+    type: 'Terminus',
+    tagline: 'UNESCO World Heritage terminus; originating hub for Konkan Kanya, Mandovi, Tejas & Vande Bharat',
+    nearbyDestinations: 'Colaba, Fort, Marine Drive, Nariman Point, Churchgate',
+    transitAccess: 'Direct terminus for Central & Harbour suburban local trains, pre-paid taxis, BEST bus hub outside.',
+  },
+  {
+    code: 'LTT',
+    name: 'Mumbai LTT',
+    area: 'Kurla / Central Suburbs',
+    type: 'Terminus',
+    tagline: 'Major terminus for southern & Konkan trains including Matsyagandha and Netravati Express',
+    nearbyDestinations: 'Bandra-Kurla Complex (BKC), Chembur, Ghatkopar, Mumbai Airport (8 km)',
+    transitAccess: 'Connected via auto rickshaws, app cabs, and suburban connection via Tilak Nagar & Kurla stations.',
+  },
+  {
+    code: 'DR',
+    name: 'Dadar',
+    area: 'Central Mumbai',
+    type: 'Transit Hub',
+    tagline: 'Premier interchange linking Central & Western railway lines; origin for Tutari Express',
+    nearbyDestinations: 'Shivaji Park, Prabhadevi, Matunga, Worli, Lower Parel',
+    transitAccess: 'Fast trains on both Western & Central lines, shared cabs, direct road access via Eastern & Western Expressways.',
+  },
+  {
+    code: 'PNVL',
+    name: 'Panvel',
+    area: 'Navi Mumbai',
+    type: 'Junction',
+    tagline: 'Universal gateway junction where ALL Konkan corridor trains halt; ideal for Navi Mumbai & Pune',
+    nearbyDestinations: 'Navi Mumbai, Kharghar, Belapur, Vashi, Pune Expressway link',
+    transitAccess: 'Harbour Line local trains, direct state buses to Pune & Western Maharashtra, NH48/Mumbai-Pune Expressway.',
+  },
+  {
+    code: 'DIV',
+    name: 'Diva',
+    area: 'Thane District',
+    type: 'Junction',
+    tagline: 'Central line junction connecting suburban network to Roha and Konkan passenger services',
+    nearbyDestinations: 'Dombivli, Kalyan, Thane, Mumbra',
+    transitAccess: 'Central railway slow & fast local trains, local shared autos.',
   },
 ];

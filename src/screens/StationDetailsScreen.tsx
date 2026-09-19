@@ -14,8 +14,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import {
   GOA_STATIONS_DATA,
   NEARBY_ALTERNATIVE_STATIONS_DATA,
+  MUMBAI_STATIONS_DATA,
   GoaStationInfo,
   NearbyAlternativeStationInfo,
+  MumbaiStationInfo,
 } from '../data/stationAlternatives';
 import { STATION_MAP } from '../data/stations';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -31,16 +33,20 @@ export const StationDetailsScreen: React.FC = () => {
 
   const [goaStation, setGoaStation] = useState<GoaStationInfo | null>(null);
   const [nearbyStation, setNearbyStation] = useState<NearbyAlternativeStationInfo | null>(null);
+  const [mumbaiStation, setMumbaiStation] = useState<MumbaiStationInfo | null>(null);
 
   useEffect(() => {
     const goa = GOA_STATIONS_DATA.find(s => s.code === stationCode) ?? null;
     const nearby = NEARBY_ALTERNATIVE_STATIONS_DATA.find(s => s.code === stationCode) ?? null;
+    const mumbai = MUMBAI_STATIONS_DATA.find(s => s.code === stationCode) ?? null;
     setGoaStation(goa);
     setNearbyStation(nearby);
+    setMumbaiStation(mumbai);
   }, [stationCode]);
 
   const rawStation = STATION_MAP[stationCode];
-  const stationName = goaStation?.name ?? nearbyStation?.name ?? rawStation?.name ?? stationCode;
+  const stationName =
+    goaStation?.name ?? nearbyStation?.name ?? mumbaiStation?.name ?? rawStation?.name ?? stationCode;
 
   const handleViewTrains = useCallback(() => {
     // Navigate to Trains tab to view journeys for this station
@@ -85,6 +91,15 @@ export const StationDetailsScreen: React.FC = () => {
             </View>
           )}
 
+          {mumbaiStation && (
+            <View style={styles.nearbyInfoBlock}>
+              <Text style={styles.nearbyStateText}>{mumbaiStation.area}</Text>
+              <View style={styles.altTag}>
+                <Text style={styles.altTagText}>{mumbaiStation.type}</Text>
+              </View>
+            </View>
+          )}
+
           {nearbyStation && (
             <View style={styles.nearbyInfoBlock}>
               <Text style={styles.nearbyStateText}>{nearbyStation.state}</Text>
@@ -108,6 +123,39 @@ export const StationDetailsScreen: React.FC = () => {
           <Ionicons name="train-outline" size={18} color="#FFFFFF" />
           <Text style={styles.primaryBtnText}>View trains</Text>
         </TouchableOpacity>
+
+        {/* Optional Secondary Information: Mumbai Station Details */}
+        {mumbaiStation && (
+          <View style={styles.infoSection}>
+            <View style={styles.card}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="information-circle-outline" size={16} color="#8A4A1C" />
+                <Text style={styles.sectionHeader}>Overview</Text>
+              </View>
+              <Text style={styles.bodyText}>{mumbaiStation.tagline}</Text>
+            </View>
+
+            {mumbaiStation.nearbyDestinations && (
+              <View style={styles.card}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="location-outline" size={16} color="#8A4A1C" />
+                  <Text style={styles.sectionHeader}>Nearby destinations</Text>
+                </View>
+                <Text style={styles.bodyText}>{mumbaiStation.nearbyDestinations}</Text>
+              </View>
+            )}
+
+            {mumbaiStation.transitAccess && (
+              <View style={styles.card}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="git-network-outline" size={16} color="#8A4A1C" />
+                  <Text style={styles.sectionHeader}>Transit & connectivity</Text>
+                </View>
+                <Text style={styles.bodyText}>{mumbaiStation.transitAccess}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Optional Secondary Information: Goa Station Details */}
         {goaStation && (
