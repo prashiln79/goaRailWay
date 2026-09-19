@@ -140,16 +140,9 @@ export const TrainsHomeScreen: React.FC = () => {
 
   const headingTitle = useMemo(() => {
     if (activeStationObj && !activeStationObj.code.startsWith('ALL_')) {
-      const dirLabel = selectedHub === 'Mumbai' ? '→ MUMBAI' : selectedHub === 'Goa' ? '→ GOA' : '';
-      return `${dirLabel ? dirLabel + ' · ' : ''}${activeStationObj.name.toUpperCase()} (${filteredTrains.length})`;
+      return `${filteredTrains.length} Trains · ${activeStationObj.shortName}`;
     }
-    const dirLabel =
-      selectedHub === 'Mumbai'
-        ? 'TRAINS TO MUMBAI'
-        : selectedHub === 'Goa'
-        ? 'TRAINS TO GOA'
-        : `${selectedHub.toUpperCase()} TRAINS`;
-    return `${dirLabel} (${filteredTrains.length})`;
+    return `${filteredTrains.length} Trains to ${selectedHub}`;
   }, [selectedHub, activeStationObj, filteredTrains.length]);
 
   // ── Train Card Renderer ──────────────────────────────────────────
@@ -181,17 +174,22 @@ export const TrainsHomeScreen: React.FC = () => {
 
       {/* Main Header */}
       <View style={styles.header}>
-        <View style={styles.headerTitles}>
-          <Text style={styles.appName}>Konkan Train Planner</Text>
-          <View style={styles.bookingBadge}>
-            <Ionicons name="calendar-outline" size={11} color="#9E3C1B" />
-            <Text style={styles.bookingBadgeText}>
-              60-day booking: <Text style={styles.bookingBadgeDate}>{bookingDateInfo}</Text>
-            </Text>
+        <View style={styles.headerTop}>
+          <View style={styles.brandTitleGroup}>
+            <View style={styles.brandIconBox}>
+              <Ionicons name="train" size={18} color="#9E3C1B" />
+            </View>
+            <Text style={styles.appName}>Goa-Mumbai Train Planner</Text>
           </View>
         </View>
-        <View style={styles.headerIconBox}>
-          <Ionicons name="train" size={20} color="#9E3C1B" />
+
+        {/* 60-Day Advance Booking Banner */}
+        <View style={styles.bookingBanner}>
+          <View style={styles.bookingBannerLeft}>
+            <Ionicons name="calendar" size={13} color="#9E3C1B" />
+            <Text style={styles.bookingBannerLabel}>60-day booking open</Text>
+          </View>
+          <Text style={styles.bookingBannerDate}>{bookingDateInfo}</Text>
         </View>
       </View>
 
@@ -202,85 +200,59 @@ export const TrainsHomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         ListHeaderComponent={
-          <View>
+          <View style={styles.listHeader}>
             {/* Search Bar Button */}
             <TouchableOpacity
               style={styles.searchBar}
               onPress={() => setSearchModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="search" size={18} color="#8A4A1C" style={styles.searchBarIcon} />
+              <Ionicons name="search" size={18} color="#9E3C1B" style={styles.searchBarIcon} />
               <Text style={styles.searchBarPlaceholder}>
-                Search train, station or destination
+                Search train, station or route...
               </Text>
               <View style={styles.searchBarShortcut}>
-                <Ionicons name="options-outline" size={14} color="#8A4A1C" />
+                <Ionicons name="options-outline" size={14} color="#9E3C1B" />
               </View>
             </TouchableOpacity>
 
-
-            {/* Top Filter Bar: Corridor Hubs & Sort Trigger */}
-            <View style={styles.topFilterBar}>
-              <View style={styles.hubChipsRow}>
-                {CORRIDOR_HUBS.map(hub => {
-                  const isActive = selectedHub === hub.id;
-                  return (
-                    <TouchableOpacity
-                      key={hub.id}
-                      style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                      onPress={() => handleHubSelect(hub.id)}
-                      activeOpacity={0.8}
+            {/* Corridor Hub Segmented Tabs */}
+            <View style={styles.hubTabsRow}>
+              {CORRIDOR_HUBS.map(hub => {
+                const isActive = selectedHub === hub.id;
+                return (
+                  <TouchableOpacity
+                    key={hub.id}
+                    style={[styles.hubTab, isActive && styles.hubTabActive]}
+                    onPress={() => handleHubSelect(hub.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={hub.icon}
+                      size={15}
+                      color={isActive ? '#FFFFFF' : '#8A4A1C'}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.hubTabText,
+                        isActive && styles.hubTabTextActive,
+                      ]}
                     >
-                      <Ionicons
-                        name={hub.icon}
-                        size={14}
-                        color={isActive ? '#FFFFFF' : '#8A4A1C'}
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          isActive && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {hub.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <TouchableOpacity
-                style={styles.topSortBtn}
-                onPress={() => setSortModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="swap-vertical" size={13} color="#9E3C1B" />
-                <Text style={styles.topSortText} numberOfLines={1}>
-                  {sortOption === 'Night journeys first'
-                    ? 'Night first'
-                    : sortOption === 'Departure time'
-                    ? 'Departure'
-                    : sortOption === 'Arrival time'
-                    ? 'Arrival'
-                    : 'Duration'}
-                </Text>
-              </TouchableOpacity>
+                      {hub.label} Trains
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {/* Dynamic Station Sub-Menu (Appears when a Hub is selected) */}
+            {/* Station Filter Pills (Clean horizontal scroll directly on canvas) */}
             {activeHub && activeHub.stations.length > 0 && (
-              <View style={styles.stationMenuContainer}>
-                <View style={styles.stationMenuHeader}>
-                  <Text style={styles.stationMenuOverline}>
-                    {activeHub.label.toUpperCase()} STATIONS
-                  </Text>
-                  <Text style={styles.stationMenuTip}>Tap station to filter</Text>
-                </View>
+              <View style={styles.stationFilterContainer}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.stationMenuScroll}
+                  contentContainerStyle={styles.stationFilterScroll}
                 >
                   {activeHub.stations.map(stn => {
                     const isStnActive = selectedStationCode === stn.code;
@@ -323,9 +295,26 @@ export const TrainsHomeScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Section Divider & All Trains Header */}
-            <View style={styles.allTrainsHeadingRow}>
-              <Text style={styles.sectionTitle}>{headingTitle}</Text>
+            {/* Feed Header: Title & Sort Trigger */}
+            <View style={styles.feedHeaderRow}>
+              <Text style={styles.feedHeaderTitle}>{headingTitle}</Text>
+
+              <TouchableOpacity
+                style={styles.sortTriggerBtn}
+                onPress={() => setSortModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="swap-vertical" size={13} color="#9E3C1B" />
+                <Text style={styles.sortTriggerText} numberOfLines={1}>
+                  {sortOption === 'Night journeys first'
+                    ? 'Night first'
+                    : sortOption === 'Departure time'
+                    ? 'Departure'
+                    : sortOption === 'Arrival time'
+                    ? 'Arrival'
+                    : 'Duration'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         }
@@ -402,57 +391,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF7F4',
   },
   header: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: '#FAF7F4',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 8,
-    backgroundColor: '#FAF7F4',
+    marginBottom: 8,
   },
-  headerTitles: {
-    flex: 1,
+  brandTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F5ECE3',
+    alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 9,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
   },
   appName: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     color: '#2C201A',
     letterSpacing: -0.3,
   },
-  bookingBadge: {
+  bookingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#F7EFE8',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 3,
-    gap: 4,
-  },
-  bookingBadgeText: {
-    fontSize: 11,
-    color: '#7A6B63',
-    fontWeight: '500',
-  },
-  bookingBadgeDate: {
-    color: '#9E3C1B',
-    fontWeight: '700',
-  },
-  headerIconBox: {
-    width: 36,
-    height: 36,
+    justifyContent: 'space-between',
+    backgroundColor: '#F5ECE3',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 10,
-    backgroundColor: '#F7EFE8',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#EFE5DC',
+    borderColor: '#E8DED6',
+  },
+  bookingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bookingBannerLabel: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#6E5D53',
+  },
+  bookingBannerDate: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#9E3C1B',
+    letterSpacing: -0.1,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
+  },
+  listHeader: {
+    paddingBottom: 4,
   },
 
   // ── Search Bar ───────────────────────────────────────────────────
@@ -463,14 +466,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E8DED6',
     shadowColor: '#2C201A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 12,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    marginBottom: 14,
   },
   searchBarIcon: {
     marginRight: 10,
@@ -479,108 +482,70 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#A8998E',
+    color: '#8A7A70',
   },
   searchBarShortcut: {
     width: 28,
     height: 28,
-    borderRadius: 6,
-    backgroundColor: '#F7EFE8',
+    borderRadius: 7,
+    backgroundColor: '#F5ECE3',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-
-  // ── Top Filter Bar (Hubs & Sort) ─────────────────────────────────
-  topFilterBar: {
+  // ── Corridor Hub Tabs ────────────────────────────────────────────
+  hubTabsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     marginBottom: 12,
   },
-  hubChipsRow: {
+  hubTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    justifyContent: 'center',
+    height: 42,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E8DED6',
   },
-  categoryChipActive: {
+  hubTabActive: {
     backgroundColor: '#9E3C1B',
     borderColor: '#9E3C1B',
+    shadowColor: '#9E3C1B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  categoryChipText: {
-    fontSize: 13,
+  hubTabText: {
+    fontSize: 13.5,
     fontWeight: '600',
     color: '#5C4E46',
   },
-  categoryChipTextActive: {
+  hubTabTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
-  topSortBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E8DED6',
-    gap: 5,
-  },
-  topSortText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9E3C1B',
-  },
 
-  // ── Dynamic Station Sub-menu ─────────────────────────────────────
-  stationMenuContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EFEAE6',
-    padding: 10,
-    marginBottom: 12,
+  // ── Station Filter Row ───────────────────────────────────────────
+  stationFilterContainer: {
+    marginBottom: 14,
   },
-  stationMenuHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 2,
-  },
-  stationMenuOverline: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#9E3C1B',
-    letterSpacing: 0.8,
-  },
-  stationMenuTip: {
-    fontSize: 11,
-    color: '#8A7A70',
-  },
-  stationMenuScroll: {
+  stationFilterScroll: {
     gap: 8,
+    paddingVertical: 2,
   },
   stationChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#F7EFE8',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#EFE5DC',
+    borderColor: '#E8DED6',
     gap: 6,
   },
   stationChipActive: {
@@ -588,24 +553,25 @@ const styles = StyleSheet.create({
     borderColor: '#9E3C1B',
   },
   stationChipText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '600',
     color: '#4A3E38',
   },
   stationChipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   stationTagBadge: {
-    backgroundColor: '#EBE2D8',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    backgroundColor: '#F5ECE3',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     borderRadius: 6,
   },
   stationTagBadgeActive: {
     backgroundColor: '#7A2C12',
   },
   stationTagBadgeText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#8A4A1C',
   },
@@ -613,19 +579,35 @@ const styles = StyleSheet.create({
     color: '#FDEEE9',
   },
 
-  // ── Section Title & List Feed ────────────────────────────────────
-  allTrainsHeadingRow: {
+  // ── Feed Header Row (Title & Sort Trigger) ───────────────────────
+  feedHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
     paddingTop: 4,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+  feedHeaderTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
     color: '#2C201A',
-    letterSpacing: 0.8,
+    letterSpacing: -0.2,
+  },
+  sortTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    gap: 5,
+  },
+  sortTriggerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9E3C1B',
   },
 
   // ── Empty State ──────────────────────────────────────────────────
