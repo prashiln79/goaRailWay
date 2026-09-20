@@ -68,45 +68,27 @@ export function filterAndSortTrains(
 ): Train[] {
   let list = [...allTrains];
 
-  // 1. Hub / Station Selection Filter — with directional logic for terminal hubs
+  // 1. Hub / Station Selection Filter — strictly Goa ⇄ Mumbai corridor
   if (selectedHub === 'Goa') {
     if (selectedStationCode && selectedStationCode !== 'ALL_GOA') {
-      // Filter trains that stop at the specific station AND are traveling TOWARD Goa / Konkan
-      // (i.e., a Mumbai/Konkan stop appears before the target stop in the stops sequence)
+      // Trains from Mumbai traveling TOWARD Goa that stop at the selected station
       list = list.filter(t => {
         const targetIdx = stopIndex(t, selectedStationCode);
         if (targetIdx === -1) return false;
-        const northBeforeTarget = t.stops
+        const mumbaiBeforeTarget = t.stops
           .slice(0, targetIdx)
-          .some(
-            s =>
-              MUMBAI_STATION_CODES.has(s.stationCode) ||
-              SWV_STATION_CODES.has(s.stationCode) ||
-              RN_STATION_CODES.has(s.stationCode),
-          );
-        return (
-          northBeforeTarget ||
-          MUMBAI_STATION_CODES.has(t.sourceStationCode) ||
-          RN_STATION_CODES.has(t.sourceStationCode)
-        );
+          .some(s => MUMBAI_STATION_CODES.has(s.stationCode));
+        return mumbaiBeforeTarget || MUMBAI_STATION_CODES.has(t.sourceStationCode);
       });
     } else {
-      // All Goa & Nearby — trains heading toward Goa OR nearby alternative stations (Sawantwadi, Kudal, Karwar)
+      // All Goa — trains from Mumbai heading toward Goa (or nearby border station like Sawantwadi)
       list = list.filter(t => {
         const firstTargetIdx = firstMatchIndex(t, GOA_AND_NEARBY_CODES);
         if (firstTargetIdx === -1) return false;
-        const northBeforeTarget = t.stops
+        const mumbaiBeforeTarget = t.stops
           .slice(0, firstTargetIdx)
-          .some(
-            s =>
-              MUMBAI_STATION_CODES.has(s.stationCode) ||
-              SWV_STATION_CODES.has(s.stationCode) ||
-              RN_STATION_CODES.has(s.stationCode),
-          );
-        const originatesNorth =
-          MUMBAI_STATION_CODES.has(t.sourceStationCode) ||
-          RN_STATION_CODES.has(t.sourceStationCode);
-        return northBeforeTarget || originatesNorth;
+          .some(s => MUMBAI_STATION_CODES.has(s.stationCode));
+        return mumbaiBeforeTarget || MUMBAI_STATION_CODES.has(t.sourceStationCode);
       });
     }
   } else if (selectedHub === 'Sawantwadi') {
@@ -125,19 +107,18 @@ export function filterAndSortTrains(
     }
   } else if (selectedHub === 'Mumbai') {
     if (selectedStationCode && selectedStationCode !== 'ALL_MUMBAI') {
-      // Filter trains that stop at the specific Mumbai station AND are traveling TOWARD Mumbai
-      // (i.e., the Mumbai stop appears after a Goa/Konkan stop)
+      // Filter trains heading from Goa (or SWV border) TO Mumbai that stop at the specific Mumbai station
       list = list.filter(t => {
         const mumbaiIdx = stopIndex(t, selectedStationCode);
         if (mumbaiIdx === -1) return false;
-        return t.stops.slice(0, mumbaiIdx).some(s => KONKAN_CODES.has(s.stationCode));
+        return t.stops.slice(0, mumbaiIdx).some(s => GOA_STATION_CODES.has(s.stationCode) || SWV_STATION_CODES.has(s.stationCode));
       });
     } else {
-      // All Mumbai hubs — trains heading FROM Goa/Konkan TO Mumbai
+      // All Mumbai hubs — trains heading from Goa (or SWV border) TO Mumbai
       list = list.filter(t => {
         const firstMumbaiIdx = firstMatchIndex(t, MUMBAI_STATION_CODES);
         if (firstMumbaiIdx === -1) return false;
-        return t.stops.slice(0, firstMumbaiIdx).some(s => KONKAN_CODES.has(s.stationCode));
+        return t.stops.slice(0, firstMumbaiIdx).some(s => GOA_STATION_CODES.has(s.stationCode) || SWV_STATION_CODES.has(s.stationCode));
       });
     }
   }
