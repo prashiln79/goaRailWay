@@ -1,45 +1,84 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  FlatList,
   StatusBar,
+  ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSavedStore } from '../store/savedStore';
-import { STATION_MAP } from '../data/stations';
+import { SavedTrain } from '../types/Connection';
+import { Train } from '../types/Train';
 import { TRAIN_MAP } from '../data/trains';
+import { trainService } from '../services/trainService';
+import { TrainCard } from '../components/TrainCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 type SavedNavProp = StackNavigationProp<RootStackParamList>;
-type SavedTab = 'Routes' | 'Trains' | 'Connections';
 
 export const SavedScreen: React.FC = () => {
   const navigation = useNavigation<SavedNavProp>();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<SavedTab>('Routes');
 
-  const {
-    savedRoutes,
-    savedTrains,
-    savedConnections,
-    toggleRouteFavorite,
-    toggleTrainFavorite,
-  } = useSavedStore();
+  const { savedTrains } = useSavedStore();
 
-  const handleRoutePress = (_fromCode: string, _toCode: string) => {
-    // Navigate to Connections or Train list
-    navigation.navigate('Connections');
+  // Resolve full Train objects from savedTrains list
+  const [resolvedTrains, setResolvedTrains] = useState<Train[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolve = async () => {
+      const results: Train[] = [];
+
+      for (const saved of savedTrains) {
+        // Fast path: hardcoded TRAIN_MAP
+        const fromMap = TRAIN_MAP[saved.trainNumber];
+        if (fromMap) {
+          results.push(fromMap);
+          continue;
+        }
+        // Slow path: special / dynamic trains via service
+        const fromService = await trainService.getTrain(saved.trainNumber);
+        if (fromService) results.push(fromService);
+      }
+
+      if (!cancelled) setResolvedTrains(results);
+    };
+
+    resolve();
+    return () => { cancelled = true; };
+  }, [savedTrains]);
+
+  const handleTrainPress = (train: Train) => {
+    navigation.navigate('TrainDetails', { trainNumber: train.trainNumber });
   };
 
-  const handleTrainPress = (trainNumber: string) => {
-    navigation.navigate('TrainDetails', { trainNumber });
-  };
+  const renderItem = ({ item, index }: ListRenderItemInfo<Train>) => (
+    <TrainCard
+      train={item}
+      onPress={handleTrainPress}
+      index={index}
+    />
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIconWrap}>
+        <Ionicons name="heart-outline" size={48} color="#C4B7AF" />
+      </View>
+      <Text style={styles.emptyTitle}>No saved trains yet</Text>
+      <Text style={styles.emptyText}>
+        Open any train and tap the{' '}
+        <Text style={styles.emptyHighlight}>♥</Text> icon to save it here for quick access.
+      </Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -47,157 +86,37 @@ export const SavedScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Saved</Text>
+        <Text style={styles.title}>Saved Trains</Text>
+        {savedTrains.length > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{savedTrains.length}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabsRow}>
-        {(['Routes', 'Trains', 'Connections'] as SavedTab[]).map(tab => {
-          const isActive = activeTab === tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabButton, isActive && styles.tabButtonActive]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <ScrollView
+      <FlatList
+        data={resolvedTrains}
+        keyExtractor={item => item.trainNumber}
+        renderItem={renderItem}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: insets.bottom + 90 },
+          resolvedTrains.length === 0 && savedTrains.length === 0 && styles.listContentCentered,
+        ]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 80 }]}
-      >
-        {/* Saved Routes */}
-        {activeTab === 'Routes' && (
-          <View>
-            {savedRoutes.map(item => {
-              const fromName = STATION_MAP[item.fromStationCode]?.name ?? item.fromStationCode;
-              const toName = STATION_MAP[item.toStationCode]?.name ?? item.toStationCode;
-
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.savedCard}
-                  onPress={() => handleRoutePress(item.fromStationCode, item.toStationCode)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconCircleBlue}>
-                      <Ionicons name="calendar-outline" size={18} color="#2563EB" />
-                    </View>
-                    <View style={styles.routeDetails}>
-                      <Text style={styles.cardTitle}>
-                        {fromName} → {toName}
-                      </Text>
-                      <Text style={styles.cardSubtitle}>
-                        {item.label ?? 'Frequently used route'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => toggleRouteFavorite(item.fromStationCode, item.toStationCode)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={item.isFavorite ? 'star' : 'star-outline'}
-                      size={20}
-                      color={item.isFavorite ? '#D97706' : '#C4B7AF'}
-                    />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Saved Trains */}
-        {activeTab === 'Trains' && (
-          <View>
-            {savedTrains.map(item => {
-              const train = TRAIN_MAP[item.trainNumber];
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.savedCard}
-                  onPress={() => handleTrainPress(item.trainNumber)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconCircleRed}>
-                      <Ionicons name="train" size={18} color="#DC2626" />
-                    </View>
-                    <View style={styles.routeDetails}>
-                      <Text style={styles.cardTitle}>
-                        {train?.name ?? 'Matsyagandha Express'}
-                      </Text>
-                      <Text style={styles.cardSubtitle}>
-                        #{item.trainNumber} · {train?.type ?? 'Express'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => toggleTrainFavorite(item.trainNumber)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons
-                      name={item.isFavorite ? 'star' : 'star-outline'}
-                      size={20}
-                      color={item.isFavorite ? '#D97706' : '#C4B7AF'}
-                    />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Saved Connections */}
-        {activeTab === 'Connections' && (
-          <View>
-            {savedConnections.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.savedCard}
-                onPress={() => navigation.navigate('Connections')}
-                activeOpacity={0.75}
-              >
-                <View style={styles.cardLeft}>
-                  <View style={styles.iconCircleOrange}>
-                    <Ionicons name="git-branch-outline" size={18} color="#D97706" />
-                  </View>
-                  <View style={styles.routeDetails}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardSubtitle}>
-                      Via {STATION_MAP[item.viaStationCode]?.name ?? item.viaStationCode} · 2 trains
-                    </Text>
-                  </View>
-                </View>
-
-                <Ionicons name="star" size={20} color="#D97706" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Bottom Help Tip */}
-        <View style={styles.hintBox}>
-          <Ionicons name="information-circle-outline" size={18} color="#8A4A1C" />
-          <View style={styles.hintContent}>
-            <Text style={styles.hintTitle}>Save your favourite routes</Text>
-            <Text style={styles.hintText}>
-              Quick access to your common journeys and connecting combinations.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+        ListFooterComponent={
+          savedTrains.length > 0 ? (
+            <View style={styles.hintBox}>
+              <Ionicons name="information-circle-outline" size={15} color="#8A4A1C" />
+              <Text style={styles.hintText}>
+                Tap a train to view details · Tap{' '}
+                <Text style={{ color: '#DC2626' }}>♥</Text> on the details screen to unsave
+              </Text>
+            </View>
+          ) : null
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -209,128 +128,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAF7F4',
   },
+
+  // ── Header ──────────────────────────────────────────────────
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 6,
+    paddingBottom: 14,
+    gap: 10,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
     color: '#2C201A',
   },
-  tabsRow: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    backgroundColor: '#EFE7E1',
-    borderRadius: 10,
-    padding: 3,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 8,
+  badge: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
     alignItems: 'center',
-    borderRadius: 8,
   },
-  tabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#7A6B63',
-  },
-  tabButtonTextActive: {
-    color: '#2C201A',
-    fontWeight: '700',
-  },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-  },
-  savedCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#EFEAE6',
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  iconCircleBlue: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconCircleRed: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#FEF2F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconCircleOrange: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#FFFBEB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  routeDetails: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2C201A',
-  },
-  cardSubtitle: {
+  badgeText: {
     fontSize: 12,
-    color: '#8A7A71',
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
+
+  // ── List ─────────────────────────────────────────────────────
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  listContentCentered: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+
+  // ── Empty State ──────────────────────────────────────────────
+  emptyState: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: '#F5EFEC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2C201A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#8A7A71',
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  emptyHighlight: {
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+
+  // ── Footer Hint ──────────────────────────────────────────────
   hintBox: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF9F5',
-    borderWidth: 1,
-    borderColor: '#F3DEC6',
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 16,
-    gap: 10,
-  },
-  hintContent: {
-    flex: 1,
-  },
-  hintTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8A4A1C',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
   hintText: {
     fontSize: 12,
-    color: '#7A6B63',
-    marginTop: 2,
-    lineHeight: 16,
+    color: '#8A7A71',
+    flex: 1,
+    lineHeight: 17,
   },
 });

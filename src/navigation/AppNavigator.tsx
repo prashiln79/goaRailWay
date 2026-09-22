@@ -1,9 +1,13 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  configureNotificationHandler,
+  addNotificationResponseListener,
+} from '../services/notificationService';
 
 import TrainsHomeScreen from '../screens/TrainsHomeScreen';
 import TrainDetailsScreen from '../screens/TrainDetailsScreen';
@@ -12,6 +16,9 @@ import StationsListScreen from '../screens/StationsListScreen';
 import StationDetailsScreen from '../screens/StationDetailsScreen';
 import SavedScreen from '../screens/SavedScreen';
 import MoreScreen from '../screens/MoreScreen';
+
+// Configure foreground notification behavior
+configureNotificationHandler();
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -89,8 +96,23 @@ function BottomTabs() {
 }
 
 const AppNavigator: React.FC = () => {
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+  useEffect(() => {
+    // When a user taps a booking notification, navigate directly to that train's details
+    const cleanup = addNotificationResponseListener(trainNumber => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('TrainDetails', { trainNumber });
+      }
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, [navigationRef]);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

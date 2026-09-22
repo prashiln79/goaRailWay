@@ -18,6 +18,8 @@ import { TrainStop } from '../types/TrainStop';
 import { trainService } from '../services/trainService';
 import { STATION_MAP } from '../data/stations';
 import { useSavedStore } from '../store/savedStore';
+import { useReminderStore } from '../store/reminderStore';
+import { BookingReminderSheet } from '../components/BookingReminderSheet';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getConnectingGoaTrains, GoaConnectingTrain } from '../utils/connectingTrainsUtils';
 
@@ -74,6 +76,11 @@ export const TrainDetailsScreen: React.FC = () => {
 
   const { isTrainSaved, toggleTrainFavorite } = useSavedStore();
   const isFavorite = isTrainSaved(trainNumber);
+
+  const [reminderModalVisible, setReminderModalVisible] = useState(false);
+  const { hasAnyReminder, getRemindersForTrain } = useReminderStore();
+  const hasReminderForThisTrain = hasAnyReminder(trainNumber);
+  const trainReminders = getRemindersForTrain(trainNumber);
 
   useEffect(() => {
     trainService.getTrain(trainNumber).then(t => {
@@ -487,17 +494,30 @@ export const TrainDetailsScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={24} color="#2C201A" />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Train Details</Text>
-        <TouchableOpacity
-          onPress={() => toggleTrainFavorite(trainNumber)}
-          style={styles.iconButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={22}
-            color={isFavorite ? '#DC2626' : '#2C201A'}
-          />
-        </TouchableOpacity>
+        <View style={styles.topBarActions}>
+          <TouchableOpacity
+            onPress={() => setReminderModalVisible(true)}
+            style={styles.iconButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={hasReminderForThisTrain ? 'notifications' : 'notifications-outline'}
+              size={22}
+              color={hasReminderForThisTrain ? '#D97706' : '#2C201A'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => toggleTrainFavorite(trainNumber)}
+            style={styles.iconButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isFavorite ? '#DC2626' : '#2C201A'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -601,6 +621,37 @@ export const TrainDetailsScreen: React.FC = () => {
                 </View>
               </ImageBackground>
             </View>
+
+            {/* Booking Opening Reminder Banner Card */}
+            <TouchableOpacity
+              style={[styles.reminderBannerCard, hasReminderForThisTrain && styles.reminderBannerCardActive]}
+              onPress={() => setReminderModalVisible(true)}
+              activeOpacity={0.88}
+            >
+              <View style={[styles.reminderBannerIconBox, hasReminderForThisTrain && styles.reminderBannerIconBoxActive]}>
+                <Ionicons
+                  name={hasReminderForThisTrain ? 'notifications' : 'alarm-outline'}
+                  size={20}
+                  color={hasReminderForThisTrain ? '#D97706' : '#9E3C1B'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.reminderBannerTitleRow}>
+                  <Text style={styles.reminderBannerTitle}>
+                    {hasReminderForThisTrain ? 'Booking Reminder Active' : 'Set Booking Opening Alert'}
+                  </Text>
+                  <View style={styles.arpPill}>
+                    <Text style={styles.arpPillText}>60-Day ARP</Text>
+                  </View>
+                </View>
+                <Text style={styles.reminderBannerSub}>
+                  {hasReminderForThisTrain
+                    ? `${trainReminders.length} reminder${trainReminders.length > 1 ? 's' : ''} set for this train · Tap to view & manage`
+                    : 'Get notified 7 days before, 1 day before, and at 8:00 AM on opening day.'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9E3C1B" />
+            </TouchableOpacity>
 
             {/* Overview Connecting Notice Banner */}
             {activeTab === 'Overview' && !connectionAnalysis?.isDirect && (connectionAnalysis?.connectingTrains.length ?? 0) > 0 && (
@@ -787,14 +838,38 @@ export const TrainDetailsScreen: React.FC = () => {
       {/* Bottom Sticky Action Bar */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 14) }]}>
         <TouchableOpacity
+          style={[styles.reminderBarBtn, hasReminderForThisTrain && styles.reminderBarBtnActive]}
+          onPress={() => setReminderModalVisible(true)}
+          activeOpacity={0.88}
+        >
+          <Ionicons
+            name={hasReminderForThisTrain ? 'notifications' : 'alarm-outline'}
+            size={18}
+            color={hasReminderForThisTrain ? '#D97706' : '#9E3C1B'}
+          />
+          <Text style={[styles.reminderBarBtnText, hasReminderForThisTrain && styles.reminderBarBtnTextActive]}>
+            {hasReminderForThisTrain ? 'Alert Active' : 'Set Reminder'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.ctaButton}
           onPress={() => Linking.openURL('https://www.irctc.co.in/nget/train-search').catch(() => {})}
           activeOpacity={0.88}
         >
           <Text style={styles.ctaButtonText}>Book on IRCTC</Text>
-          <Ionicons name="open-outline" size={18} color="#FFFFFF" />
+          <Ionicons name="open-outline" size={17} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Booking Reminder Sheet Modal */}
+      {train && (
+        <BookingReminderSheet
+          visible={reminderModalVisible}
+          onClose={() => setReminderModalVisible(false)}
+          train={train}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -1978,19 +2053,107 @@ const styles = StyleSheet.create({
     borderTopColor: '#EFE7E1',
     paddingHorizontal: 16,
     paddingTop: 12,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  reminderBarBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEECE6',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  reminderBarBtnActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+  },
+  reminderBarBtnText: {
+    color: '#9E3C1B',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reminderBarBtnTextActive: {
+    color: '#B45309',
   },
   ctaButton: {
+    flex: 1.25,
     backgroundColor: '#9E3C1B',
     flexDirection: 'row',
     borderRadius: 14,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   ctaButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
+  },
+
+  // ── Top Bar & Reminder Banner Card ──────────────────────────────
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reminderBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    gap: 10,
+  },
+  reminderBannerCardActive: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  reminderBannerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEECE6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderBannerIconBoxActive: {
+    backgroundColor: '#FEF3C7',
+  },
+  reminderBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reminderBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2C201A',
+  },
+  reminderBannerSub: {
+    fontSize: 11,
+    color: '#7A6B63',
+    marginTop: 2,
+  },
+  arpPill: {
+    backgroundColor: '#FEECE6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  arpPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9E3C1B',
   },
 });

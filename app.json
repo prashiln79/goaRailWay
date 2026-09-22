@@ -12,6 +12,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Goa Rail Map to use your location to find nearby stations."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#9E3C1B"
+        }
       ]
     ],
     "ios": {

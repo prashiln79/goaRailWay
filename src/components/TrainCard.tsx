@@ -136,7 +136,19 @@ export interface FrequencyBadgeInfo {
   iconName: keyof typeof Ionicons.glyphMap;
 }
 
-export function getFrequencyBadge(runningDays?: number[]): FrequencyBadgeInfo {
+export function getFrequencyBadge(runningDays?: number[], isSpecial?: boolean): FrequencyBadgeInfo {
+  // Special trains from RailRadar API get a distinct badge
+  if (isSpecial) {
+    return {
+      label: 'Special Service',
+      isDaily: false,
+      bg: '#FEF2F2',
+      text: '#B91C1C',
+      borderColor: '#FCA5A5',
+      iconName: 'star-outline',
+    };
+  }
+
   const days = runningDays ?? [];
   const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -193,6 +205,7 @@ export function getFrequencyBadge(runningDays?: number[]): FrequencyBadgeInfo {
     iconName: 'calendar-outline',
   };
 }
+
 
 // ── Segment type used by home-screen explorer ──────────────────────────────
 export interface TrainCardSegment {
@@ -301,7 +314,7 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
   // Whether we are in the explorer (home) context
   const isExplorer = segment !== undefined;
   const catInfo = getTrainCategory(train);
-  const freqInfo = getFrequencyBadge(train.runningDays);
+  const freqInfo = getFrequencyBadge(train.runningDays, train.isSpecial);
   const isOddRow = typeof index === 'number' && index % 2 !== 0;
 
   return (

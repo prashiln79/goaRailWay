@@ -6,70 +6,66 @@ interface SavedState {
   savedTrains: SavedTrain[];
   savedConnections: SavedConnection[];
 
-  toggleRouteFavorite: (fromStationCode: string, toStationCode: string, label?: string) => void;
+  // Trains
   toggleTrainFavorite: (trainNumber: string) => void;
-  toggleConnectionFavorite: (id: string, title: string, fromCode: string, toCode: string, viaCode: string) => void;
-  isRouteSaved: (fromStationCode: string, toStationCode: string) => boolean;
   isTrainSaved: (trainNumber: string) => boolean;
+
+  // Routes (kept for future use, not shown in Saved tab)
+  toggleRouteFavorite: (fromStationCode: string, toStationCode: string, label?: string) => void;
+  isRouteSaved: (fromStationCode: string, toStationCode: string) => boolean;
+
+  // Connections
+  toggleConnectionFavorite: (id: string, title: string, fromCode: string, toCode: string, viaCode: string) => void;
 }
 
 export const useSavedStore = create<SavedState>((set, get) => ({
-  savedRoutes: [
-    {
-      id: 'sr-1',
-      fromStationCode: 'LTT',
-      toStationCode: 'THVM',
-      isFavorite: true,
-      label: 'Frequently used',
-    },
-    {
-      id: 'sr-2',
-      fromStationCode: 'CSMT',
-      toStationCode: 'MAO',
-      isFavorite: false,
-      label: 'Holiday trip',
-    },
-    {
-      id: 'sr-3',
-      fromStationCode: 'PNVL',
-      toStationCode: 'MAO',
-      isFavorite: false,
-    },
-  ],
+  // Seed data — only truly favorited trains are pre-seeded
+  savedRoutes: [],
+
   savedTrains: [
     {
       id: 'st-1',
       trainNumber: '12619',
       isFavorite: true,
     },
-    {
-      id: 'st-2',
-      trainNumber: '10103',
-      isFavorite: false,
-    },
-  ],
-  savedConnections: [
-    {
-      id: 'sc-1',
-      title: 'Mumbai → Ratnagiri → Thivim',
-      fromStationCode: 'LTT',
-      toStationCode: 'THVM',
-      viaStationCode: 'RN',
-      train1Number: '12619',
-      train2Number: '50104',
-      isFavorite: true,
-    },
   ],
 
+  savedConnections: [],
+
+  // ─── Trains ────────────────────────────────────────────────────────
+  toggleTrainFavorite: (trainNumber) => {
+    const { savedTrains } = get();
+    const existing = savedTrains.find(t => t.trainNumber === trainNumber);
+    if (existing) {
+      // Already saved → unsave (remove entirely)
+      set({ savedTrains: savedTrains.filter(t => t.trainNumber !== trainNumber) });
+    } else {
+      // Not saved → save
+      set({
+        savedTrains: [
+          ...savedTrains,
+          {
+            id: `st-${Date.now()}`,
+            trainNumber,
+            isFavorite: true,
+          },
+        ],
+      });
+    }
+  },
+
+  isTrainSaved: (trainNumber) => {
+    return get().savedTrains.some(t => t.trainNumber === trainNumber);
+  },
+
+  // ─── Routes ────────────────────────────────────────────────────────
   toggleRouteFavorite: (fromStationCode, toStationCode, label) => {
     const { savedRoutes } = get();
     const existing = savedRoutes.find(
       r => r.fromStationCode === fromStationCode && r.toStationCode === toStationCode,
     );
     if (existing) {
-      set({
-        savedRoutes: savedRoutes.filter(r => r.id !== existing.id),
-      });
+      set({ savedRoutes: savedRoutes.filter(r => r.id !== existing.id) });
     } else {
       set({
         savedRoutes: [
@@ -86,34 +82,18 @@ export const useSavedStore = create<SavedState>((set, get) => ({
     }
   },
 
-  toggleTrainFavorite: (trainNumber) => {
-    const { savedTrains } = get();
-    const existing = savedTrains.find(t => t.trainNumber === trainNumber);
-    if (existing) {
-      set({
-        savedTrains: savedTrains.filter(t => t.trainNumber !== trainNumber),
-      });
-    } else {
-      set({
-        savedTrains: [
-          ...savedTrains,
-          {
-            id: `st-${Date.now()}`,
-            trainNumber,
-            isFavorite: true,
-          },
-        ],
-      });
-    }
+  isRouteSaved: (fromCode, toCode) => {
+    return get().savedRoutes.some(
+      r => r.fromStationCode === fromCode && r.toStationCode === toCode,
+    );
   },
 
+  // ─── Connections ───────────────────────────────────────────────────
   toggleConnectionFavorite: (id, title, fromCode, toCode, viaCode) => {
     const { savedConnections } = get();
     const existing = savedConnections.find(c => c.id === id);
     if (existing) {
-      set({
-        savedConnections: savedConnections.filter(c => c.id !== id),
-      });
+      set({ savedConnections: savedConnections.filter(c => c.id !== id) });
     } else {
       set({
         savedConnections: [
@@ -124,22 +104,12 @@ export const useSavedStore = create<SavedState>((set, get) => ({
             fromStationCode: fromCode,
             toStationCode: toCode,
             viaStationCode: viaCode,
-            train1Number: '12619',
-            train2Number: '50104',
+            train1Number: '',
+            train2Number: '',
             isFavorite: true,
           },
         ],
       });
     }
-  },
-
-  isRouteSaved: (fromCode, toCode) => {
-    return get().savedRoutes.some(
-      r => r.fromStationCode === fromCode && r.toStationCode === toCode,
-    );
-  },
-
-  isTrainSaved: (trainNumber) => {
-    return get().savedTrains.some(t => t.trainNumber === trainNumber);
   },
 }));
