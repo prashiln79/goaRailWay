@@ -17,6 +17,183 @@ export function getTrainTypeColor(type: string): string {
   return colors[type] ?? '#9E3C1B';
 }
 
+export type TrainCategory = 'PREMIUM' | 'SUPERFAST' | 'EXPRESS' | 'PASSENGER';
+export type TrainGroup = 'SUPERFAST_PREMIUM' | 'EXPRESS_PASSENGER';
+
+export interface TrainCategoryInfo {
+  category: TrainCategory;
+  group: TrainGroup;
+  label: string;
+  badgeBg: string;
+  badgeText: string;
+  accentBorderColor: string;
+  iconName: keyof typeof Ionicons.glyphMap;
+  isSuperfastOrPremium: boolean;
+}
+
+export function getTrainCategory(train: Train): TrainCategoryInfo {
+  const isPremium =
+    train.type === 'VandeBharat' ||
+    train.type === 'Tejas' ||
+    train.type === 'Rajdhani';
+
+  const isSuperfast =
+    !isPremium &&
+    (train.name.includes('SF') ||
+      train.name.includes('Superfast') ||
+      train.trainNumber.startsWith('12') ||
+      train.trainNumber.startsWith('20') ||
+      train.trainNumber.startsWith('22'));
+
+  const isPassenger =
+    train.type === 'Passenger' ||
+    train.type === 'DEMU' ||
+    train.name.includes('Passenger');
+
+  if (train.type === 'VandeBharat') {
+    return {
+      category: 'PREMIUM',
+      group: 'SUPERFAST_PREMIUM',
+      label: 'Vande Bharat',
+      badgeBg: '#EBF3FF',
+      badgeText: '#0052CC',
+      accentBorderColor: '#0052CC',
+      iconName: 'flash',
+      isSuperfastOrPremium: true,
+    };
+  }
+
+  if (train.type === 'Tejas') {
+    return {
+      category: 'PREMIUM',
+      group: 'SUPERFAST_PREMIUM',
+      label: 'Tejas',
+      badgeBg: '#F5EDFF',
+      badgeText: '#7928CA',
+      accentBorderColor: '#7928CA',
+      iconName: 'star',
+      isSuperfastOrPremium: true,
+    };
+  }
+
+  if (train.type === 'Rajdhani') {
+    return {
+      category: 'PREMIUM',
+      group: 'SUPERFAST_PREMIUM',
+      label: 'Rajdhani',
+      badgeBg: '#FFF1EE',
+      badgeText: '#D9381E',
+      accentBorderColor: '#D9381E',
+      iconName: 'ribbon',
+      isSuperfastOrPremium: true,
+    };
+  }
+
+  if (isSuperfast) {
+    return {
+      category: 'SUPERFAST',
+      group: 'SUPERFAST_PREMIUM',
+      label: 'Superfast',
+      badgeBg: '#FFF7ED',
+      badgeText: '#C2410C',
+      accentBorderColor: '#EA580C',
+      iconName: 'flash-outline',
+      isSuperfastOrPremium: true,
+    };
+  }
+
+  if (isPassenger) {
+    return {
+      category: 'PASSENGER',
+      group: 'EXPRESS_PASSENGER',
+      label: 'Passenger',
+      badgeBg: '#F0FDF4',
+      badgeText: '#15803D',
+      accentBorderColor: '#16A34A',
+      iconName: 'subway-outline',
+      isSuperfastOrPremium: false,
+    };
+  }
+
+  return {
+    category: 'EXPRESS',
+    group: 'EXPRESS_PASSENGER',
+    label: 'Express',
+    badgeBg: '#F3F4F6',
+    badgeText: '#4B5563',
+    accentBorderColor: '#9CA3AF',
+    iconName: 'train-outline',
+    isSuperfastOrPremium: false,
+  };
+}
+
+export interface FrequencyBadgeInfo {
+  label: string;
+  isDaily: boolean;
+  bg: string;
+  text: string;
+  borderColor: string;
+  iconName: keyof typeof Ionicons.glyphMap;
+}
+
+export function getFrequencyBadge(runningDays?: number[]): FrequencyBadgeInfo {
+  const days = runningDays ?? [];
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  if (days.length === 7) {
+    return {
+      label: 'Runs Daily',
+      isDaily: true,
+      bg: '#ECFDF5',
+      text: '#047857',
+      borderColor: '#A7F3D0',
+      iconName: 'repeat',
+    };
+  }
+
+  if (days.length === 6) {
+    const missing = [1, 2, 3, 4, 5, 6, 0].find(d => !days.includes(d));
+    const missingName = missing !== undefined ? DAY_NAMES[missing] : '';
+    return {
+      label: missingName ? `Daily ex. ${missingName}` : '6 days/wk',
+      isDaily: false,
+      bg: '#F0FDF4',
+      text: '#15803D',
+      borderColor: '#BBF7D0',
+      iconName: 'calendar-outline',
+    };
+  }
+
+  if (days.length === 1) {
+    const dayName = DAY_NAMES[days[0]];
+    return {
+      label: `Weekly (${dayName})`,
+      isDaily: false,
+      bg: '#FFFBEB',
+      text: '#B45309',
+      borderColor: '#FDE68A',
+      iconName: 'calendar-outline',
+    };
+  }
+
+  // 2 to 5 days
+  const sorted = [...days].sort((a, b) => {
+    const orderA = a === 0 ? 7 : a;
+    const orderB = b === 0 ? 7 : b;
+    return orderA - orderB;
+  });
+  const daysStr = sorted.map(d => DAY_NAMES[d]).join(', ');
+
+  return {
+    label: daysStr || 'Special',
+    isDaily: false,
+    bg: '#EFF6FF',
+    text: '#1D4ED8',
+    borderColor: '#BFDBFE',
+    iconName: 'calendar-outline',
+  };
+}
+
 // ── Segment type used by home-screen explorer ──────────────────────────────
 export interface TrainCardSegment {
   fromCode: string;
@@ -115,25 +292,6 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
     return `${Math.floor(diff / 60)}h ${(diff % 60).toString().padStart(2, '0')}m`;
   })();
 
-  // ── Journey type ─────────────────────────────────────────────────────────
-  const depHour = parseInt(depTime.split(':')[0] || '12', 10);
-  const arrHour = parseInt(arrTime.split(':')[0] || '12', 10);
-
-  // A train is overnight if it crosses midnight / arrives next day
-  const isOvernight = dayOffset > 0;
-
-  // Daytime is 05:00 to 18:59
-  const isDepDay = depHour >= 5 && depHour < 19;
-  const isArrDay = arrHour >= 5 && arrHour < 19;
-
-  const journeyType = isOvernight
-    ? { label: '🌙 Overnight', bg: '#E8E1F1', text: '#57466F' }
-    : isDepDay && isArrDay
-      ? { label: '☀️ Day', bg: '#FEF3C7', text: '#92400E' }
-      : isDepDay && !isArrDay
-        ? { label: '🌅 Evening', bg: '#FFEDD5', text: '#9A3412' }
-        : { label: '🌙 Night', bg: '#EDE9FE', text: '#5B21B6' };
-
   // ── Goa stops count ──────────────────────────────────────────────────────
   const goaStopsCount = train.stops.filter(s =>
     ['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG', 'SVDEM', 'KULEM'].includes(s.stationCode),
@@ -142,7 +300,9 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
   const isAlternative = destinationType === 'NEARBY';
   // Whether we are in the explorer (home) context
   const isExplorer = segment !== undefined;
-  const isOddRow = index !== undefined && index % 2 === 1;
+  const catInfo = getTrainCategory(train);
+  const freqInfo = getFrequencyBadge(train.runningDays);
+  const isOddRow = typeof index === 'number' && index % 2 !== 0;
 
   return (
     <TouchableOpacity
@@ -150,13 +310,17 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
         styles.card,
         isOddRow && styles.cardOdd,
         isSelected && styles.cardSelected,
+        {
+          borderLeftWidth: 3.5,
+          borderLeftColor: catInfo.accentBorderColor,
+        },
         isAlternative && !isExplorer && styles.cardAlternative,
         showAltNotice && styles.cardAlt,
       ]}
       onPress={() => onPress(train)}
       activeOpacity={0.88}
     >
-      {/* ── Header: Train Name, Number Badge & Journey Type ── */}
+      {/* ── Header: Train Name, Number Badge & Action Chevron ── */}
       <View style={styles.headerRow}>
         <View style={styles.nameBlock}>
           <Text style={styles.trainName} numberOfLines={1}>
@@ -166,13 +330,46 @@ export const TrainCard: React.FC<TrainCardProps> = memo(({
             <Text style={styles.trainNumber}>{train.trainNumber}</Text>
           </View>
         </View>
-        <View style={styles.headerRight}>
-          <View style={[styles.badgeJourneyType, { backgroundColor: journeyType.bg }]}>
-            <Text style={[styles.badgeJourneyTypeText, { color: journeyType.text }]} numberOfLines={1}>
-              {journeyType.label}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={15} color="#A89D96" />
+        <Ionicons name="chevron-forward" size={16} color="#A89D96" />
+      </View>
+
+      {/* ── Badges Row: Category (Left) · Frequency / Running Days (Right) ── */}
+      <View style={styles.badgesRow}>
+        <View style={[styles.badgeCategory, { backgroundColor: catInfo.badgeBg }]}>
+          <Ionicons
+            name={catInfo.iconName}
+            size={11}
+            color={catInfo.badgeText}
+            style={styles.badgeIcon}
+          />
+          <Text
+            style={[styles.badgeCategoryText, { color: catInfo.badgeText }]}
+            numberOfLines={1}
+          >
+            {catInfo.label}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.badgeFrequency,
+            {
+              backgroundColor: freqInfo.bg,
+              borderColor: freqInfo.borderColor,
+            },
+          ]}
+        >
+          <Ionicons
+            name={freqInfo.iconName}
+            size={11}
+            color={freqInfo.text}
+            style={styles.badgeIcon}
+          />
+          <Text
+            style={[styles.badgeFrequencyText, { color: freqInfo.text }]}
+            numberOfLines={1}
+          >
+            {freqInfo.label}
+          </Text>
         </View>
       </View>
 
@@ -309,7 +506,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 7,
   },
   nameBlock: {
     flexDirection: 'row',
@@ -341,23 +538,43 @@ const styles = StyleSheet.create({
     color: '#7A6B63',
     letterSpacing: 0.2,
   },
-  headerRight: {
+  badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  badgeJourneyType: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 5,
-    flexShrink: 0,
+  badgeIcon: {
+    marginRight: 4,
+  },
+  badgeCategory: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    flexShrink: 0,
   },
-  badgeJourneyTypeText: {
-    fontSize: 10,
+  badgeCategoryText: {
+    fontSize: 10.5,
     fontWeight: '700',
+    letterSpacing: 0.15,
+  },
+  badgeFrequency: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  badgeFrequencyText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.1,
   },
 
   // ── Journey & Timings Section ────────────────────────────────────────────

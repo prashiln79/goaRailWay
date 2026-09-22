@@ -27,7 +27,15 @@ type TrainDetailsNavProp = StackNavigationProp<RootStackParamList>;
 type TabOption = 'Overview' | 'Connecting Trains';
 type ConnFilterType = 'ALL' | 'TRAINS' | 'BUSES';
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 
 export const formatRunningDays = (runningDays: number[]): string => {
   if (!runningDays || runningDays.length === 0) return 'Special';
