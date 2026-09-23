@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Station } from '../types/Station';
 import { StationOption } from '../types/JourneyResult';
-import { STATIONS } from '../data/stations';
+import { stationService } from '../services/stationService';
 
 interface SearchStationModalProps {
   visible: boolean;
@@ -58,11 +58,18 @@ export const SearchStationModal: React.FC<SearchStationModalProps> = ({
   onSelectStation,
 }) => {
   const [query, setQuery] = useState('');
+  const [stations, setStations] = useState<Station[]>([]);
+
+  React.useEffect(() => {
+    if (visible) {
+      stationService.getAllStations().then(setStations);
+    }
+  }, [visible]);
 
   const q = query.toLowerCase().trim();
 
   // Filter regular stations
-  const filteredStations = STATIONS.filter(s => {
+  const filteredStations = stations.filter(s => {
     if (!q) return true;
     return (
       s.name.toLowerCase().includes(q) ||

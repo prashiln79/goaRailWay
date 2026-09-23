@@ -1,5 +1,4 @@
 import { Train } from '../types/Train';
-import { TRAINS } from '../data/trains';
 import { GOA_STATION_CODES, MUMBAI_STATION_CODES } from '../data/corridorHubs';
 import { STATION_MAP } from '../data/stations';
 import { getBusAndRoadTransit, RoadTransitDetails } from '../data/busTimetable';
@@ -64,7 +63,7 @@ function formatMinutes(totalMins: number): string {
  * 1. TO_GOA: Train terminates at Sawantwadi -> finds onward trains from Sawantwadi into Goa.
  * 2. TO_MUMBAI: Train starts at Sawantwadi -> finds feeder trains from Goa to Sawantwadi.
  */
-export function getConnectingGoaTrains(currentTrain: Train): ConnectionAnalysis {
+export function getConnectingGoaTrains(currentTrain: Train, allTrains: Train[] = []): ConnectionAnalysis {
   const stops = currentTrain.stops;
   if (!stops || stops.length === 0) {
     return {
@@ -107,7 +106,7 @@ export function getConnectingGoaTrains(currentTrain: Train): ConnectionAnalysis 
 
     if (!isDirect) {
       // Find feeder trains departing from Goa that arrive at transferStationCode BEFORE transferDepTime
-      for (const t of TRAINS) {
+      for (const t of allTrains) {
         if (t.trainNumber === currentTrain.trainNumber) continue;
 
         // Must have a stop in Goa
@@ -205,7 +204,7 @@ export function getConnectingGoaTrains(currentTrain: Train): ConnectionAnalysis 
 
   if (!isDirect) {
     // Train ends short of Goa (e.g. at Sawantwadi Road) -> find onward trains into Goa
-    for (const t of TRAINS) {
+    for (const t of allTrains) {
       if (t.trainNumber === currentTrain.trainNumber) continue;
 
       const stopIdx = t.stops.findIndex(s => s.stationCode === transferStationCode);

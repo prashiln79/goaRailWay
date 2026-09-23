@@ -11,10 +11,9 @@
 
 import { Train, TrainType } from '../types/Train';
 import { RailRadarTrain } from './railRadarService';
-import { TRAINS } from '../data/trains';
 
-// Pre-build a set of hardcoded train numbers for O(1) lookups
-const HARDCODED_NUMBERS = new Set(TRAINS.map(t => t.trainNumber));
+// Dynamic train numbers set for deduplication
+const KNOWN_NUMBERS = new Set<string>();
 
 // Day-string parsing helpers (some APIs return "SMTWTFS" format)
 // Index: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
@@ -69,8 +68,8 @@ function normalizeToTrain(raw: RailRadarTrain): Train | null {
   const num = raw.train_number?.trim();
   if (!num) return null;
 
-  // Skip trains already in hardcoded dataset
-  if (HARDCODED_NUMBERS.has(num)) return null;
+  // Skip trains already known
+  if (KNOWN_NUMBERS.has(num)) return null;
 
   const src = raw.source_station_code?.toUpperCase() ?? '';
   const dst = raw.destination_station_code?.toUpperCase() ?? '';
@@ -127,13 +126,15 @@ export function normalizeSpecialTrains(rawTrains: RailRadarTrain[]): Train[] {
 }
 
 /**
- * Merges the hardcoded TRAINS list with special trains fetched from RailRadar.
- * Hardcoded trains always take precedence.
+ * Merges base trains with special trains fetched from RailRadar.
  *
  * @param specials - Output of normalizeSpecialTrains()
+ * @param baseTrains - Existing trains from Firebase
  * @returns Combined and deduplicated train list
  */
-export function mergeWithHardcoded(specials: Train[]): Train[] {
-  if (specials.length === 0) return TRAINS;
-  return [...TRAINS, ...specials];
+export function mergeWithBaseTrains(specials: Train[], baseTrains: Train[] = []): Train[] {
+  if (specials.length === 0) return baseTrains;
+  const existingSet = new Set(baseTrains.map(t => t.trainNumber));
+  const newSpecials = specials.filter(s => !existingSet.has(s.trainNumber));
+  return [...baseTrains, ...newSpecials];
 }

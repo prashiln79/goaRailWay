@@ -1,10 +1,8 @@
 import { Train } from '../types/Train';
-import { TRAINS, TRAIN_MAP } from '../data/trains';
 import { GOA_STATION_CODES, MUMBAI_STATION_CODES } from '../data/stations';
 import { ConnectionOption } from '../types/Connection';
-import { MOCK_CONNECTIONS } from '../data/connections';
-import { getRailRadarCorridorTrains } from './railRadarService';
-import { normalizeSpecialTrains, mergeWithHardcoded } from './specialTrainsNormalizer';
+import { getFirebaseTrains } from './firebaseTrainService';
+import { getFirebaseConnections } from './firebaseConnectionService';
 
 export interface ITrainService {
   getAllTrains(): Promise<Train[]>;
@@ -18,20 +16,25 @@ export interface ITrainService {
 }
 
 /**
- * Combined train service:
- * 1. Fetches special trains from RailRadar API (cached weekly)
- * 2. Merges with hardcoded TRAINS list (hardcoded trains take precedence)
- * 3. Falls back silently to hardcoded list if API is unavailable
+ * Train service backed by Firebase Firestore.
+ *
+ * Data flow:
+ *   1. On first call, fetches all trains from Firestore (cached 7 days in AsyncStorage).
+ *   2. On cache hit, returns instantly with zero network calls.
+ *
+ * To refresh Firestore data, run:
+ *   npx ts-node --project tsconfig.seed.json scripts/seedAllFirestore.ts
  */
 class TrainService implements ITrainService {
-  /** Singleton merged list — resolved once per app session after the first call */
-  private _cachedMergedTrains: Train[] | null = null;
+  /** In-session memory cache — resolved once per app session */
+  private _cachedTrains: Train[] | null = null;
+  private _trainsMap: Map<string, Train> = new Map();
   private _fetchPromise: Promise<Train[]> | null = null;
 
   async getAllTrains(): Promise<Train[]> {
     // Return in-session cache immediately if available
-    if (this._cachedMergedTrains) {
-      return this._cachedMergedTrains;
+    if (this._cachedTrains) {
+      return this._cachedTrains;
     }
 
     // Deduplicate concurrent calls
@@ -39,36 +42,18 @@ class TrainService implements ITrainService {
       return this._fetchPromise;
     }
 
-    this._fetchPromise = (async () => {
-      try {
-        const rawSpecials = await getRailRadarCorridorTrains();
-        const specialTrains = normalizeSpecialTrains(rawSpecials);
-        const merged = mergeWithHardcoded(specialTrains);
-
-        if (specialTrains.length > 0) {
-          console.log(
-            `[TrainService] Loaded ${TRAINS.length} hardcoded + ${specialTrains.length} special trains`,
-          );
-        }
-
-        this._cachedMergedTrains = merged;
-        return merged;
-      } catch (err) {
-        console.warn('[TrainService] RailRadar fetch failed, using hardcoded data:', err);
-        this._cachedMergedTrains = TRAINS;
-        return TRAINS;
-      }
-    })();
+    this._fetchPromise = getFirebaseTrains().then((trains) => {
+      this._cachedTrains = trains;
+      this._trainsMap = new Map(trains.map((t) => [t.trainNumber, t]));
+      return trains;
+    });
 
     return this._fetchPromise;
   }
 
   async getTrain(trainNumber: string): Promise<Train | null> {
-    // First check hardcoded map for O(1) lookup
-    if (TRAIN_MAP[trainNumber]) return TRAIN_MAP[trainNumber];
-    // Then check merged list (for specials)
-    const all = await this.getAllTrains();
-    return all.find(t => t.trainNumber === trainNumber) ?? null;
+    await this.getAllTrains();
+    return this._trainsMap.get(trainNumber) ?? null;
   }
 
   async getTrainsAtStation(stationCode: string): Promise<Train[]> {
@@ -109,7 +94,7 @@ class TrainService implements ITrainService {
     _toCode: string,
     _date?: string,
   ): Promise<ConnectionOption[]> {
-    return Promise.resolve(MOCK_CONNECTIONS);
+    return getFirebaseConnections();
   }
 }
 

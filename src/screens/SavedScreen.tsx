@@ -14,7 +14,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useSavedStore } from '../store/savedStore';
 import { SavedTrain } from '../types/Connection';
 import { Train } from '../types/Train';
-import { TRAIN_MAP } from '../data/trains';
 import { trainService } from '../services/trainService';
 import { TrainCard } from '../components/TrainCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -37,13 +36,6 @@ export const SavedScreen: React.FC = () => {
       const results: Train[] = [];
 
       for (const saved of savedTrains) {
-        // Fast path: hardcoded TRAIN_MAP
-        const fromMap = TRAIN_MAP[saved.trainNumber];
-        if (fromMap) {
-          results.push(fromMap);
-          continue;
-        }
-        // Slow path: special / dynamic trains via service
         const fromService = await trainService.getTrain(saved.trainNumber);
         if (fromService) results.push(fromService);
       }

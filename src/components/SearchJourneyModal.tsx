@@ -13,8 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Train } from '../types/Train';
 import { Station } from '../types/Station';
-import { TRAINS } from '../data/trains';
-import { STATIONS, STATION_MAP } from '../data/stations';
+import { trainService } from '../services/trainService';
+import { stationService } from '../services/stationService';
+import { STATION_MAP } from '../data/stations';
 import { KONKAN_SEARCH_DESTINATIONS, SearchDestination } from '../data/searchDestinations';
 import { getTrainTypeColor } from './TrainCard';
 
@@ -70,6 +71,15 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
   // Route mode state
   const [routeFrom, setRouteFrom] = useState('CSMT');
   const [routeTo, setRouteTo] = useState('THVM');
+  const [allTrains, setAllTrains] = useState<Train[]>([]);
+  const [allStations, setAllStations] = useState<Station[]>([]);
+
+  React.useEffect(() => {
+    if (visible) {
+      trainService.getAllTrains().then(setAllTrains);
+      stationService.getAllStations().then(setAllStations);
+    }
+  }, [visible]);
 
   // Filtered results for instant mode
   const instantResults = useMemo<UnifiedResultItem[]>(() => {
@@ -79,7 +89,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
     const items: UnifiedResultItem[] = [];
 
     // 1. Match trains (by number or name)
-    const matchingTrains = TRAINS.filter(
+    const matchingTrains = allTrains.filter(
       t =>
         t.trainNumber.toLowerCase().includes(q) ||
         t.name.toLowerCase().includes(q) ||
@@ -89,7 +99,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
     matchingTrains.forEach(t => items.push({ kind: 'train', train: t }));
 
     // 2. Match stations (by code, name, state, zone)
-    const matchingStations = STATIONS.filter(
+    const matchingStations = allStations.filter(
       s =>
         s.code.toLowerCase().includes(q) ||
         s.name.toLowerCase().includes(q) ||
@@ -113,7 +123,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
     });
 
     return items;
-  }, [query]);
+  }, [query, allTrains, allStations]);
 
   // Route mode trains
   const routeTrains = useMemo<Train[]>(() => {
@@ -121,7 +131,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
     const MUMBAI_CODES = new Set(['CSMT', 'LTT', 'DR', 'PNVL', 'BCT', 'BDTS', 'DIV']);
     const isFromMumbai = MUMBAI_CODES.has(routeFrom);
 
-    return TRAINS.filter(train => {
+    return allTrains.filter(train => {
       let fromIdx = train.stops.findIndex(s => s.stationCode === routeFrom);
       if (fromIdx < 0 && isFromMumbai) {
         fromIdx = train.stops.findIndex(s => MUMBAI_CODES.has(s.stationCode));
@@ -131,7 +141,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
       const toIdx = train.stops.findIndex((s, i) => i > fromIdx && s.stationCode === routeTo);
       return toIdx > fromIdx;
     });
-  }, [mode, routeFrom, routeTo]);
+  }, [mode, routeFrom, routeTo, allTrains]);
 
   const handleSelectQuickSuggestion = useCallback((text: string) => {
     setQuery(text);

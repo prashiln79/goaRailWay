@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ConnectionOption } from '../types/Connection';
-import { MOCK_CONNECTIONS } from '../data/connections';
+import { getFirebaseConnections } from '../services/firebaseConnectionService';
 import ConnectionCard from '../components/ConnectionCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -28,9 +28,14 @@ export const ConnectionsScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabOption>('Best Options');
   const [selectedOptionForModal, setSelectedOptionForModal] = useState<ConnectionOption | null>(null);
+  const [connections, setConnections] = useState<ConnectionOption[]>([]);
 
-  const directOptions = MOCK_CONNECTIONS.filter(c => c.type === 'direct');
-  const connectingOptions = MOCK_CONNECTIONS.filter(c => c.type === 'connecting');
+  React.useEffect(() => {
+    getFirebaseConnections().then(setConnections);
+  }, []);
+
+  const directOptions = connections.filter(c => c.type === 'direct');
+  const connectingOptions = connections.filter(c => c.type === 'connecting');
 
   const displayedConnecting =
     activeTab === 'Best Options' ? connectingOptions.slice(0, 2) : connectingOptions;

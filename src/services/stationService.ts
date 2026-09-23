@@ -1,30 +1,45 @@
 import { Station } from '../types/Station';
-import { STATIONS, STATION_MAP } from '../data/stations';
+import { getFirebaseStations } from './firebaseStationService';
 
-/**
- * Abstract interface for station data access.
- * Swap MockStationService for SupabaseStationService without touching any UI.
- */
 export interface IStationService {
   getAllStations(): Promise<Station[]>;
   getStation(code: string): Promise<Station | null>;
   searchStations(query: string): Promise<Station[]>;
 }
 
-class MockStationService implements IStationService {
+class StationService implements IStationService {
+  private _cachedStations: Station[] | null = null;
+  private _stationsMap: Map<string, Station> = new Map();
+  private _fetchPromise: Promise<Station[]> | null = null;
+
   async getAllStations(): Promise<Station[]> {
-    return Promise.resolve(STATIONS);
+    if (this._cachedStations) {
+      return this._cachedStations;
+    }
+    if (this._fetchPromise) {
+      return this._fetchPromise;
+    }
+
+    this._fetchPromise = getFirebaseStations().then((stations) => {
+      this._cachedStations = stations;
+      this._stationsMap = new Map(stations.map((s) => [s.code, s]));
+      return stations;
+    });
+
+    return this._fetchPromise;
   }
 
   async getStation(code: string): Promise<Station | null> {
-    return Promise.resolve(STATION_MAP[code] ?? null);
+    await this.getAllStations();
+    return this._stationsMap.get(code) ?? null;
   }
 
   async searchStations(query: string): Promise<Station[]> {
     const q = query.toLowerCase().trim();
     if (!q) return [];
-    return STATIONS.filter(
-      s =>
+    const all = await this.getAllStations();
+    return all.filter(
+      (s) =>
         s.name.toLowerCase().includes(q) ||
         s.code.toLowerCase().includes(q) ||
         s.state.toLowerCase().includes(q),
@@ -32,5 +47,5 @@ class MockStationService implements IStationService {
   }
 }
 
-/** Singleton service — swap implementation here to switch to API */
-export const stationService: IStationService = new MockStationService();
+/** Singleton service backed by Firebase Firestore & 7-day cache */
+export const stationService: IStationService = new StationService();

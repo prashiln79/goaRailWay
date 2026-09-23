@@ -82,7 +82,10 @@ export const TrainDetailsScreen: React.FC = () => {
   const hasReminderForThisTrain = hasAnyReminder(trainNumber);
   const trainReminders = getRemindersForTrain(trainNumber);
 
+  const [allTrains, setAllTrains] = useState<Train[]>([]);
+
   useEffect(() => {
+    trainService.getAllTrains().then(setAllTrains);
     trainService.getTrain(trainNumber).then(t => {
       setTrain(t);
       setLoading(false);
@@ -91,8 +94,8 @@ export const TrainDetailsScreen: React.FC = () => {
 
   const connectionAnalysis = useMemo(() => {
     if (!train) return null;
-    return getConnectingGoaTrains(train);
-  }, [train]);
+    return getConnectingGoaTrains(train, allTrains);
+  }, [train, allTrains]);
 
   const isGoaStation = (code: string) => {
     return ['PER', 'THVM', 'KRMI', 'MAO', 'CNO', 'VSG', 'SVDEM', 'KULEM'].includes(code);
