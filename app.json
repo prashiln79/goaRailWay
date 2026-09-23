@@ -33,7 +33,8 @@
       "package": "com.goarailway.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#1A73E8"
+        "backgroundImage": "./assets/android-icon-background.png",
+        "backgroundColor": "#182338"
       },
       "config": {
         "googleMaps": {
