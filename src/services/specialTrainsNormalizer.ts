@@ -26,7 +26,7 @@ function parseRunningDays(train: RailRadarTrain): number[] {
   }
 
   // Parse "SMTWTFS" or "1000010" style strings
-  const str = train.days_of_run;
+  const str = (train as any).days_of_run;
   if (!str) return [0, 1, 2, 3, 4, 5, 6]; // default: daily if unknown
 
   if (str.length === 7) {

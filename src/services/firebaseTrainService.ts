@@ -15,7 +15,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, writeBatch, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ensureSignedIn } from './authService';
 import { Train } from '../types/Train';
@@ -28,6 +28,8 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TRAINS_COLLECTION = 'trains';
 const META_DOC_ID = '_meta';
 
+import { kvStore } from '../utils/kvStore';
+
 // ─── Cache envelope ───────────────────────────────────────────────────────────
 
 interface TrainsCache {
@@ -38,22 +40,12 @@ interface TrainsCache {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function readCache(): Promise<TrainsCache | null> {
-  try {
-    const raw = await AsyncStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as TrainsCache;
-  } catch {
-    return null;
-  }
+  return kvStore.get<TrainsCache>(CACHE_KEY);
 }
 
 async function writeCache(trains: Train[]): Promise<void> {
-  try {
-    const payload: TrainsCache = { fetchedAt: Date.now(), trains };
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch (err) {
-    console.warn('[FirebaseTrainService] Failed to write cache:', err);
-  }
+  const payload: TrainsCache = { fetchedAt: Date.now(), trains };
+  await kvStore.set<TrainsCache>(CACHE_KEY, payload);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -128,10 +120,43 @@ export async function getFirebaseTrainsLastUpdated(): Promise<Date | null> {
  * on the next call to getFirebaseTrains().
  */
 export async function clearFirebaseTrainsCache(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(CACHE_KEY);
-    console.log('[FirebaseTrainService] Cache cleared');
-  } catch (err) {
-    console.warn('[FirebaseTrainService] Failed to clear cache:', err);
+  await kvStore.remove(CACHE_KEY);
+  console.log('[FirebaseTrainService] Cache cleared');
+}
+
+/**
+ * Saves or updates an array of trains in Firestore and updates the metadata timestamp.
+ * Also clears the local cache so subsequent reads pick up fresh data.
+ */
+export async function saveFirebaseTrains(
+  trains: Train[],
+  sourceLabel = 'RailRadar Sync',
+): Promise<void> {
+  const BATCH_SIZE = 400;
+
+  for (let i = 0; i < trains.length; i += BATCH_SIZE) {
+    const chunk = trains.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+
+    for (const train of chunk) {
+      const ref = doc(db, TRAINS_COLLECTION, train.trainNumber);
+      batch.set(ref, train, { merge: true });
+    }
+
+    await batch.commit();
   }
+
+  // Update metadata document
+  const metaRef = doc(db, TRAINS_COLLECTION, META_DOC_ID);
+  await setDoc(
+    metaRef,
+    {
+      lastUpdatedAt: serverTimestamp(),
+      trainCount: trains.length,
+      syncedFrom: sourceLabel,
+    },
+    { merge: true },
+  );
+
+  await clearFirebaseTrainsCache();
 }

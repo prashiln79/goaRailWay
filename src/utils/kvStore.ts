@@ -1,65 +1,80 @@
 /**
  * kvStore — lightweight cross-platform key-value persistence.
  *
- * On Web (Expo Web / React Native Web):  uses window.localStorage
- * On Native (iOS / Android):             falls back to a runtime-imported
- *                                        AsyncStorage if available,
- *                                        otherwise in-memory (session-only).
- *
- * This avoids needing @react-native-async-storage as a hard dependency
- * while still providing persistent caching on all platforms.
+ * Works safely across:
+ *   - React Native (iOS / Android) via AsyncStorage
+ *   - Web via window.localStorage
+ *   - Node.js / CLI testing via in-memory Map fallback
  */
 
-type StorageBackend = {
-  getItem(key: string): Promise<string | null>;
-  setItem(key: string, value: string): Promise<void>;
-  removeItem(key: string): Promise<void>;
-};
-
-// --- Web localStorage backend ---
-const webBackend: StorageBackend = {
-  getItem: (key) => Promise.resolve(globalThis.localStorage?.getItem(key) ?? null),
-  setItem: (key, value) => {
-    globalThis.localStorage?.setItem(key, value);
-    return Promise.resolve();
-  },
-  removeItem: (key) => {
-    globalThis.localStorage?.removeItem(key);
-    return Promise.resolve();
-  },
-};
-
-// --- In-memory fallback backend (native without AsyncStorage) ---
 const memStore = new Map<string, string>();
-const memBackend: StorageBackend = {
-  getItem: (key) => Promise.resolve(memStore.get(key) ?? null),
-  setItem: (key, value) => {
-    memStore.set(key, value);
-    return Promise.resolve();
-  },
-  removeItem: (key) => {
-    memStore.delete(key);
-    return Promise.resolve();
-  },
-};
 
-function getBackend(): StorageBackend {
-  if (typeof globalThis !== 'undefined' && typeof globalThis.localStorage !== 'undefined') {
-    return webBackend;
+async function getStorageItem(key: string): Promise<string | null> {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    if (AsyncStorage?.getItem) {
+      return await AsyncStorage.getItem(key);
+    }
+  } catch {
+    // fallback to memStore
   }
-  return memBackend;
+  return memStore.get(key) ?? null;
+}
+
+async function setStorageItem(key: string, value: string): Promise<void> {
+  memStore.set(key, value);
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    if (AsyncStorage?.setItem) {
+      await AsyncStorage.setItem(key, value);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function removeStorageItem(key: string): Promise<void> {
+  memStore.delete(key);
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    if (AsyncStorage?.removeItem) {
+      await AsyncStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export const kvStore = {
-  get: <T>(key: string): Promise<T | null> =>
-    getBackend().getItem(key).then(raw => {
-      if (!raw) return null;
-      try { return JSON.parse(raw) as T; } catch { return null; }
-    }),
+  get: async <T>(key: string): Promise<T | null> => {
+    const raw = await getStorageItem(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  },
 
-  set: <T>(key: string, value: T): Promise<void> =>
-    getBackend().setItem(key, JSON.stringify(value)),
+  set: async <T>(key: string, value: T): Promise<void> => {
+    await setStorageItem(key, JSON.stringify(value));
+  },
 
-  remove: (key: string): Promise<void> =>
-    getBackend().removeItem(key),
+  remove: async (key: string): Promise<void> => {
+    await removeStorageItem(key);
+  },
 };

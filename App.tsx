@@ -6,18 +6,24 @@ import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ensureSignedIn } from './src/services/authService';
+import { checkAndSyncWeeklyTrains } from './src/services/trainSyncService';
 
 LogBox.ignoreLogs([
   'InteractionManager has been deprecated',
 ]);
 
 export default function App() {
-  // Sign in anonymously as early as possible so Firestore reads are authenticated.
-  // Firebase Auth persists the UID across restarts — this is a no-op on re-launches.
   useEffect(() => {
-    ensureSignedIn().catch((err) =>
-      console.warn('[App] Anonymous sign-in failed — Firestore reads will fall back to local data:', err),
-    );
+    ensureSignedIn()
+      .catch((err) =>
+        console.warn('[App] Anonymous sign-in warning:', err),
+      )
+      .finally(() => {
+        // Check if Firebase data is 1 week old; if so, update from RailRadar in the background
+        checkAndSyncWeeklyTrains().catch((err) =>
+          console.warn('[App] Weekly train sync check warning:', err),
+        );
+      });
   }, []);
 
   return (
