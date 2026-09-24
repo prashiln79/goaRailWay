@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSavedStore } from '../store/savedStore';
 import { SavedTrain } from '../types/Connection';
@@ -17,12 +17,20 @@ import { Train } from '../types/Train';
 import { trainService } from '../services/trainService';
 import { TrainCard } from '../components/TrainCard';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTabBarVisibility } from '../context/TabBarVisibilityContext';
 
 type SavedNavProp = StackNavigationProp<RootStackParamList>;
 
 export const SavedScreen: React.FC = () => {
   const navigation = useNavigation<SavedNavProp>();
   const insets = useSafeAreaInsets();
+  const { handleScroll, showTabBar } = useTabBarVisibility();
+
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+    }, [showTabBar])
+  );
 
   const { savedTrains } = useSavedStore();
 
@@ -93,10 +101,12 @@ export const SavedScreen: React.FC = () => {
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 90 },
+          { paddingBottom: insets.bottom + 105 },
           resolvedTrains.length === 0 && savedTrains.length === 0 && styles.listContentCentered,
         ]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListFooterComponent={
           savedTrains.length > 0 ? (
             <View style={styles.hintBox}>

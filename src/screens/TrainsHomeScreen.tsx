@@ -11,15 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { Train } from '../types/Train';
 import { trainService } from '../services/trainService';
 import { TrainCard } from '../components/TrainCard';
 import { SearchJourneyModal } from '../components/SearchJourneyModal';
+import { AdvanceBookingCalendarModal } from '../components/AdvanceBookingCalendarModal';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useCorridorStore } from '../store/corridorStore';
+import { useTabBarVisibility } from '../context/TabBarVisibilityContext';
 
 import {
   CorridorHubId,
@@ -54,6 +56,13 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const TrainsHomeScreen: React.FC = () => {
   const navigation = useNavigation<TrainsHomeNavProp>();
   const insets = useSafeAreaInsets();
+  const { handleScroll, showTabBar } = useTabBarVisibility();
+
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+    }, [showTabBar])
+  );
 
   // ── State ────────────────────────────────────────────────────────
   const [allTrains, setAllTrains] = useState<Train[]>([]);
@@ -79,6 +88,7 @@ export const TrainsHomeScreen: React.FC = () => {
   // Modals
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
 
   // ── Data Loading ─────────────────────────────────────────────────
   useEffect(() => {
@@ -184,13 +194,20 @@ export const TrainsHomeScreen: React.FC = () => {
         </View>
 
         {/* 60-Day Advance Booking Banner */}
-        <View style={styles.bookingBanner}>
+        <TouchableOpacity
+          style={styles.bookingBanner}
+          onPress={() => setCalendarModalVisible(true)}
+          activeOpacity={0.75}
+        >
           <View style={styles.bookingBannerLeft}>
             <Ionicons name="calendar" size={13} color="#9E3C1B" />
             <Text style={styles.bookingBannerLabel}>60-day booking open</Text>
           </View>
-          <Text style={styles.bookingBannerDate}>{bookingDateInfo}</Text>
-        </View>
+          <View style={styles.bookingBannerRight}>
+            <Text style={styles.bookingBannerDate}>{bookingDateInfo}</Text>
+            <Ionicons name="chevron-forward" size={14} color="#9E3C1B" style={{ marginLeft: 3 }} />
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Train Feed */}
@@ -198,7 +215,9 @@ export const TrainsHomeScreen: React.FC = () => {
         data={filteredTrains}
         keyExtractor={item => `feed-train-${item.trainNumber}`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 95 }]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             {/* Search Bar Button */}
@@ -336,6 +355,12 @@ export const TrainsHomeScreen: React.FC = () => {
         onSelectStation={handleSelectStation}
       />
 
+      {/* 60-Day Advance Booking Calendar Modal */}
+      <AdvanceBookingCalendarModal
+        visible={calendarModalVisible}
+        onClose={() => setCalendarModalVisible(false)}
+      />
+
       {/* Sort Options Modal */}
       <Modal visible={sortModalVisible} transparent animationType="fade">
         <TouchableOpacity
@@ -449,6 +474,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#9E3C1B',
     letterSpacing: -0.1,
+  },
+  bookingBannerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   scrollContent: {
     paddingHorizontal: 16,

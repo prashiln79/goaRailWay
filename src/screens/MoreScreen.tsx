@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,18 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTabBarVisibility } from '../context/TabBarVisibilityContext';
 
 export const MoreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { handleScroll, showTabBar } = useTabBarVisibility();
+
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+    }, [showTabBar])
+  );
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [disclaimerModal, setDisclaimerModal] = useState(false);
@@ -55,7 +64,9 @@ export const MoreScreen: React.FC = () => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 95 }]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={styles.menuCard}>
           {renderMenuItem(

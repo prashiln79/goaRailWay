@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useCorridorStore } from '../store/corridorStore';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTabBarVisibility } from '../context/TabBarVisibilityContext';
 
 type StationsNavProp = StackNavigationProp<RootStackParamList>;
 
@@ -277,6 +278,13 @@ export const StationsListScreen: React.FC = () => {
   const navigation = useNavigation<StationsNavProp>();
   const insets = useSafeAreaInsets();
   const { selectedHub } = useCorridorStore();
+  const { handleScroll, showTabBar } = useTabBarVisibility();
+
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+    }, [showTabBar])
+  );
 
   const [viewMode, setViewMode] = useState<ViewMode>('MAP');
   const [listFilter, setListFilter] = useState<ListFilter>('ALL');
@@ -403,7 +411,9 @@ export const StationsListScreen: React.FC = () => {
       {/* ── Content ── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 105 }]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {viewMode === 'MAP' ? (
           <CorridorMap

@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBar, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated } from 'react-native';
+import { TabBarVisibilityProvider, useTabBarVisibility } from '../context/TabBarVisibilityContext';
 import {
   configureNotificationHandler,
   addNotificationResponseListener,
@@ -37,21 +39,46 @@ export type TabParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-function BottomTabs() {
+const AnimatedTabBar: React.FC<BottomTabBarProps> = (props) => {
+  const { translateY } = useTabBarVisibility();
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        transform: [{ translateY }],
+      }}
+    >
+      <BottomTabBar {...props} />
+    </Animated.View>
+  );
+};
+
+function BottomTabsNavigator() {
   const insets = useSafeAreaInsets();
+  const { showTabBar } = useTabBarVisibility();
 
   return (
     <Tab.Navigator
       initialRouteName="Trains"
+      tabBar={(props) => <AnimatedTabBar {...props} />}
+      screenListeners={{
+        state: () => {
+          showTabBar();
+        },
+      }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#EFEAE6',
-          height: 62 + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 8,
+          height: 72 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 12),
+          paddingTop: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -92,6 +119,14 @@ function BottomTabs() {
         options={{ tabBarLabel: 'More' }}
       />
     </Tab.Navigator>
+  );
+}
+
+function BottomTabs() {
+  return (
+    <TabBarVisibilityProvider>
+      <BottomTabsNavigator />
+    </TabBarVisibilityProvider>
   );
 }
 
