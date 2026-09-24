@@ -63,6 +63,46 @@ export const formatRunningDays = (runningDays: number[]): string => {
   return sorted.map(d => DAY_LABELS[d]).join(', ');
 };
 
+// ── Indicative fare ranges per train type (Mumbai–Goa corridor, ~500–1300 km) ──
+type FareClass = { label: string; code: string; range: string; color: string };
+
+const FARE_CLASSES: Record<string, FareClass[]> = {
+  VandeBharat: [
+    { label: 'Chair Car',       code: 'CC', range: '\u20B9 1,350 – 1,855', color: '#1E824C' },
+    { label: 'Executive Chair', code: 'EC', range: '\u20B9 2,650 – 3,530', color: '#9E3C1B' },
+  ],
+  Rajdhani: [
+    { label: '3rd AC',   code: '3A', range: '\u20B9 1,810 – 2,390', color: '#1565C0' },
+    { label: '2nd AC',   code: '2A', range: '\u20B9 2,590 – 3,445', color: '#6A1B9A' },
+    { label: '1st AC',   code: '1A', range: '\u20B9 4,370 – 5,820', color: '#9E3C1B' },
+  ],
+  Tejas: [
+    { label: 'Chair Car',       code: 'CC', range: '\u20B9 1,175 – 1,605', color: '#1E824C' },
+    { label: 'Executive Chair', code: 'EC', range: '\u20B9 2,125 – 2,865', color: '#9E3C1B' },
+  ],
+  Express: [
+    { label: 'Sleeper',  code: 'SL', range: '\u20B9  355 –   545', color: '#2E7D32' },
+    { label: '3rd AC',   code: '3A', range: '\u20B9  975 – 1,420', color: '#1565C0' },
+    { label: '2nd AC',   code: '2A', range: '\u20B9 1,380 – 2,015', color: '#6A1B9A' },
+    { label: '1st AC',   code: '1A', range: '\u20B9 2,330 – 3,395', color: '#9E3C1B' },
+  ],
+  Mail: [
+    { label: 'Sleeper',  code: 'SL', range: '\u20B9  310 –   480', color: '#2E7D32' },
+    { label: '3rd AC',   code: '3A', range: '\u20B9  870 – 1,275', color: '#1565C0' },
+    { label: '2nd AC',   code: '2A', range: '\u20B9 1,235 – 1,805', color: '#6A1B9A' },
+    { label: '1st AC',   code: '1A', range: '\u20B9 2,085 – 3,040', color: '#9E3C1B' },
+  ],
+  Passenger: [
+    { label: 'Unreserved / General', code: 'UR', range: '\u20B9   50 –   180', color: '#558B2F' },
+  ],
+  DEMU: [
+    { label: 'Unreserved / General', code: 'UR', range: '\u20B9   30 –   120', color: '#558B2F' },
+  ],
+};
+
+const getFareClasses = (type: string): FareClass[] =>
+  FARE_CLASSES[type] ?? FARE_CLASSES['Express'];
+
 export const TrainDetailsScreen: React.FC = () => {
   const route = useRoute<TrainDetailsRouteProp>();
   const navigation = useNavigation<TrainDetailsNavProp>();
@@ -762,7 +802,38 @@ export const TrainDetailsScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Connecting Trains Header Card */}
+            {/* ── Fare Range Card (Overview only) ── */}
+            {activeTab === 'Overview' && (
+              <View style={styles.fareCard}>
+                <View style={styles.fareCardHeader}>
+                  <View style={styles.fareCardIconBox}>
+                    <Ionicons name="ticket-outline" size={16} color="#9E3C1B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fareCardTitle}>Indicative Fare Range</Text>
+                    <Text style={styles.fareCardSub}>Mumbai – Goa corridor (approx.)</Text>
+                  </View>
+                  <View style={styles.fareCardDisclaimer}>
+                    <Text style={styles.fareCardDisclaimerText}>Estimated</Text>
+                  </View>
+                </View>
+                <View style={styles.fareRowsWrap}>
+                  {getFareClasses(train.type).map((fc) => (
+                    <View key={fc.code} style={styles.fareRow}>
+                      <View style={[styles.fareCodeBadge, { backgroundColor: fc.color + '18' }]}>
+                        <Text style={[styles.fareCodeText, { color: fc.color }]}>{fc.code}</Text>
+                      </View>
+                      <Text style={styles.fareClassLabel}>{fc.label}</Text>
+                      <Text style={styles.fareRangeText}>{fc.range}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.fareNote}>
+                  ⚠️ Fares vary by distance, quota, season &amp; dynamic pricing. Check IRCTC for exact fare.
+                </Text>
+              </View>
+            )}
+
             {activeTab === 'Connecting Trains' && connectionAnalysis && (
               <View style={styles.connHeaderCard}>
                 <View style={styles.connHeaderRow}>
@@ -2158,5 +2229,76 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#9E3C1B',
+  },
+
+  // ── Fare Range Card ────────────────────────────────────────────
+  fareCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#2C201A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  fareCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5EFE9',
+  },
+  fareCardIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#FEECE6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fareCardTitle: { fontSize: 14, fontWeight: '800', color: '#2C201A' },
+  fareCardSub: { fontSize: 11, color: '#8A7A70', marginTop: 1 },
+  fareCardDisclaimer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  fareCardDisclaimerText: { fontSize: 10, fontWeight: '700', color: '#92400E' },
+  fareRowsWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+  fareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F3EF',
+  },
+  fareCodeBadge: {
+    width: 38,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  fareCodeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  fareClassLabel: { flex: 1, fontSize: 13, fontWeight: '600', color: '#3C2C24' },
+  fareRangeText: { fontSize: 13, fontWeight: '800', color: '#2C201A', fontVariant: ['tabular-nums'] },
+  fareNote: {
+    fontSize: 11,
+    color: '#8A7A70',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    paddingTop: 4,
+    lineHeight: 16,
   },
 });

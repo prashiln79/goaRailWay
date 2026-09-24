@@ -23,9 +23,9 @@ import RailwayMap from '../components/RailwayMap';
 
 import TrainCard from '../components/TrainCard';
 import FilterChips from '../components/FilterChips';
-import SearchBar from '../components/SearchBar';
 import StationBottomSheet from '../components/StationBottomSheet';
 import TrainBottomSheet from '../components/TrainBottomSheet';
+import { SearchJourneyModal } from '../components/SearchJourneyModal';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 type MapScreenNavProp = StackNavigationProp<RootStackParamList>;
@@ -51,7 +51,7 @@ const MapScreen: React.FC = () => {
   const [allStations, setAllStations] = useState<Station[]>([]);
   const [stationTrains, setStationTrains] = useState<Train[]>([]);
   const [stationLoading, setStationLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -142,9 +142,9 @@ const MapScreen: React.FC = () => {
     [setRegion],
   );
 
-  const handleSearchFocus = useCallback(() => {
-    (navigation as any).navigate('Search');
-  }, [navigation]);
+  const handleSearchOpen = useCallback(() => {
+    setSearchModalVisible(true);
+  }, []);
 
   const carouselRef = useRef<FlatList>(null);
 
@@ -191,14 +191,19 @@ const MapScreen: React.FC = () => {
 
           {/* ─── Floating top bar ─── */}
           <View style={[styles.topBar, { top: topInset + 8 }]}>
-            <View style={styles.searchWrapper}>
-              <SearchBar
-                value={searchText}
-                onChangeText={setSearchText}
-                onFocus={handleSearchFocus}
-                onClear={() => setSearchText('')}
-              />
-            </View>
+            <TouchableOpacity
+              style={styles.searchWrapper}
+              onPress={handleSearchOpen}
+              activeOpacity={0.85}
+            >
+              <View style={styles.searchBarBtn}>
+                <Ionicons name="search" size={17} color="#9E3C1B" style={{ marginRight: 10 }} />
+                <Text style={styles.searchBarBtnText}>Search trains, stations, routes…</Text>
+                <View style={styles.searchBarBadge}>
+                  <Ionicons name="git-commit-outline" size={13} color="#9E3C1B" />
+                </View>
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.settingsBtn}>
               <Ionicons name="layers-outline" size={20} color="#374151" />
             </TouchableOpacity>
@@ -285,6 +290,20 @@ const MapScreen: React.FC = () => {
           onClose={handleCloseTrain}
           onViewRoute={handleViewRoute}
         />
+
+        {/* ─── Unified Search & Journey Modal ─── */}
+        <SearchJourneyModal
+          visible={searchModalVisible}
+          onClose={() => setSearchModalVisible(false)}
+          onSelectTrain={(train) => {
+            setSearchModalVisible(false);
+            navigation.navigate('TrainDetails', { trainNumber: train.trainNumber });
+          }}
+          onSelectStation={(code) => {
+            setSearchModalVisible(false);
+            navigation.navigate('StationDetails', { stationCode: code });
+          }}
+        />
       </View>
     </View>
   );
@@ -316,6 +335,35 @@ const styles = StyleSheet.create({
   },
   searchWrapper: {
     flex: 1,
+  },
+  searchBarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0E7DE',
+  },
+  searchBarBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8A7A70',
+  },
+  searchBarBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#F5ECE3',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settingsBtn: {
     width: 42,
