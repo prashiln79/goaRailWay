@@ -217,7 +217,7 @@ export interface TrainCardSegment {
   toName: string;
   toTime: string;
   toDay: number;
-  direction: '→ Goa' | '→ Mumbai' | 'Halt' | '→ Nearby';
+  direction: string;
   directionColor: string;
   directionBg: string;
 }

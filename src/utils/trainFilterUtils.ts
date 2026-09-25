@@ -357,3 +357,130 @@ export function getNightSortMinutes(timeStr: string): number {
   const [h, m] = (timeStr || '00:00').split(':').map(Number);
   return h >= 12 ? h * 60 + m : (h + 24) * 60 + m;
 }
+
+/**
+ * Computes the journey segment between a specific origin and destination station pair.
+ */
+export function getJourneySegment(
+  train: Train,
+  fromCode: string,
+  toCode: string,
+): TrainCardSegment | null {
+  const MUMBAI_CODES = new Set(['CSMT', 'LTT', 'DR', 'PNVL', 'BCT', 'BDTS', 'DIV', 'TNA']);
+  let fromIdx = train.stops.findIndex(s => s.stationCode === fromCode);
+  if (fromIdx < 0 && MUMBAI_CODES.has(fromCode)) {
+    fromIdx = train.stops.findIndex(s => MUMBAI_CODES.has(s.stationCode));
+  }
+  if (fromIdx < 0) return null;
+
+  let toIdx = train.stops.findIndex((s, i) => i > fromIdx && s.stationCode === toCode);
+  if (toIdx < 0 && MUMBAI_CODES.has(toCode)) {
+    toIdx = train.stops.findIndex((s, i) => i > fromIdx && MUMBAI_CODES.has(s.stationCode));
+  }
+  if (toIdx <= fromIdx) return null;
+
+  const fromStop = train.stops[fromIdx];
+  const toStop = train.stops[toIdx];
+  if (!fromStop || !toStop) return null;
+
+  const fromName = STATION_MAP[fromStop.stationCode]?.name ?? fromStop.stationCode;
+  const toName = STATION_MAP[toStop.stationCode]?.name ?? toStop.stationCode;
+
+  return {
+    fromCode: fromStop.stationCode,
+    fromName,
+    fromTime: fromStop.departureTime || fromStop.arrivalTime || '',
+    fromDay: fromStop.dayOffset ?? 0,
+    toCode: toStop.stationCode,
+    toName,
+    toTime: toStop.arrivalTime || toStop.departureTime || '',
+    toDay: toStop.dayOffset ?? 0,
+    direction: `→ ${toName}`,
+    directionColor: '#9E3C1B',
+    directionBg: '#FCEFE9',
+  };
+}
+
+/**
+ * Filters and sorts trains matching a specific journey route and optional date.
+ */
+export function filterAndSortJourneyTrains(
+  allTrains: Train[],
+  fromCode: string,
+  toCode: string,
+  date?: string,
+  sortOption: SortType = 'Night journeys first',
+): Train[] {
+  const MUMBAI_CODES = new Set(['CSMT', 'LTT', 'DR', 'PNVL', 'BCT', 'BDTS', 'DIV', 'TNA']);
+  const isFromMumbai = MUMBAI_CODES.has(fromCode);
+  const isToMumbai = MUMBAI_CODES.has(toCode);
+
+  let list = allTrains.filter(train => {
+    let fromIdx = train.stops.findIndex(s => s.stationCode === fromCode);
+    if (fromIdx < 0 && isFromMumbai) {
+      fromIdx = train.stops.findIndex(s => MUMBAI_CODES.has(s.stationCode));
+    }
+    if (fromIdx < 0) return false;
+
+    let toIdx = train.stops.findIndex((s, i) => i > fromIdx && s.stationCode === toCode);
+    if (toIdx < 0 && isToMumbai) {
+      toIdx = train.stops.findIndex((s, i) => i > fromIdx && MUMBAI_CODES.has(s.stationCode));
+    }
+    return toIdx > fromIdx;
+  });
+
+  if (date) {
+    const d = new Date(date + 'T00:00:00');
+    if (!isNaN(d.getTime())) {
+      const dayOfWeek = d.getDay();
+      list = list.filter(t => t.runningDays?.includes(dayOfWeek));
+    }
+  }
+
+  return list.sort((a, b) => {
+    const aSeg = getJourneySegment(a, fromCode, toCode);
+    const bSeg = getJourneySegment(b, fromCode, toCode);
+
+    const aDepTime = aSeg?.fromTime || getDepTime(a);
+    const bDepTime = bSeg?.fromTime || getDepTime(b);
+    const aArrTime = aSeg?.toTime || (a.stops[a.stops.length - 1]?.arrivalTime ?? '00:00');
+    const bArrTime = bSeg?.toTime || (b.stops[b.stops.length - 1]?.arrivalTime ?? '00:00');
+
+    if (sortOption === 'Night journeys first') {
+      const aNight = aSeg
+        ? (aSeg.toDay > aSeg.fromDay ||
+            parseInt(aSeg.fromTime.split(':')[0] || '12', 10) >= 17 ||
+            parseInt(aSeg.fromTime.split(':')[0] || '12', 10) < 4)
+        : false;
+      const bNight = bSeg
+        ? (bSeg.toDay > bSeg.fromDay ||
+            parseInt(bSeg.fromTime.split(':')[0] || '12', 10) >= 17 ||
+            parseInt(bSeg.fromTime.split(':')[0] || '12', 10) < 4)
+        : false;
+
+      if (aNight && !bNight) return -1;
+      if (!aNight && bNight) return 1;
+
+      if (aNight && bNight) {
+        return getNightSortMinutes(aDepTime) - getNightSortMinutes(bDepTime);
+      }
+      return aDepTime.localeCompare(bDepTime);
+    }
+
+    if (sortOption === 'Departure time') return aDepTime.localeCompare(bDepTime);
+    if (sortOption === 'Arrival time') return aArrTime.localeCompare(bArrTime);
+    if (sortOption === 'Journey duration') {
+      const getDur = (seg: TrainCardSegment | null, t: Train) => {
+        if (seg) {
+          const [dh, dm] = (seg.fromTime || '00:00').split(':').map(Number);
+          const [ah, am] = (seg.toTime || '00:00').split(':').map(Number);
+          return (seg.toDay - seg.fromDay) * 1440 + (ah * 60 + am) - (dh * 60 + dm);
+        }
+        return 0;
+      };
+      return getDur(aSeg, a) - getDur(bSeg, b);
+    }
+    return 0;
+  });
+}
+

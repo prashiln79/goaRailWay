@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,16 +18,19 @@ import { Station } from '../types/Station';
 import { trainService } from '../services/trainService';
 import { stationService } from '../services/stationService';
 import { STATION_MAP } from '../data/stations';
-import { getTrainTypeColor } from './TrainCard';
+import { filterAndSortJourneyTrains } from '../utils/trainFilterUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface SearchJourneyModalProps {
+export interface SearchJourneyModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectTrain: (train: Train) => void;
-  onSelectStation: (stationCode: string) => void;
+  onSelectTrain?: (train: Train) => void;
+  onSelectStation?: (stationCode: string) => void;
   onPlanRoute?: (fromCode: string, toCode: string, date?: string) => void;
+  initialFrom?: string;
+  initialTo?: string;
+  initialDate?: string;
 }
 
 type StationPickTarget = 'from' | 'to' | null;
@@ -39,6 +42,17 @@ const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const POPULAR_ROUTES = [
+  { label: 'Mumbai → Madgaon', from: 'CSMT', to: 'MAO' },
+  { label: 'Madgaon → Mumbai', from: 'MAO', to: 'CSMT' },
+  { label: 'Mumbai → Thivim', from: 'CSMT', to: 'THVM' },
+  { label: 'Panvel → Madgaon', from: 'PNVL', to: 'MAO' },
+  { label: 'Madgaon → Panvel', from: 'MAO', to: 'PNVL' },
+  { label: 'LTT → Madgaon', from: 'LTT', to: 'MAO' },
+  { label: 'Sawantwadi → Mumbai', from: 'SWV', to: 'CSMT' },
+  { label: 'Ratnagiri → Mumbai', from: 'RN', to: 'CSMT' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toISODate = (d: Date): string => {
@@ -46,15 +60,6 @@ const toISODate = (d: Date): string => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-};
-
-const formatDateDisplay = (iso: string): string => {
-  const d = new Date(iso + 'T00:00:00');
-  const today = new Date(); today.setHours(0,0,0,0);
-  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} (${DAY_NAMES[d.getDay()]})`;
 };
 
 const formatDateLong = (iso: string): string => {
@@ -122,7 +127,7 @@ const StationPicker: React.FC<StationPickerProps> = ({ target, currentCode, allS
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={22} color="#2C201A" />
         </TouchableOpacity>
-        <Text style={spStyles.title}>Select {target === 'from' ? 'Origin' : 'Destination'}</Text>
+        <Text style={spStyles.title}>Select {target === 'from' ? 'Origin (From)' : 'Destination (To)'}</Text>
         <View style={{ width: 24 }} />
       </View>
       <View style={spStyles.inputWrap}>
@@ -214,11 +219,11 @@ interface MiniCalendarProps {
 const MiniCalendar: React.FC<MiniCalendarProps> = ({ selectedDate, onSelectDate, minDate, maxDate }) => {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewYear, setViewYear] = useState(() => {
-    const d = new Date(selectedDate + 'T00:00:00');
+    const d = new Date((selectedDate || toISODate(today)) + 'T00:00:00');
     return d.getFullYear();
   });
   const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date(selectedDate + 'T00:00:00');
+    const d = new Date((selectedDate || toISODate(today)) + 'T00:00:00');
     return d.getMonth();
   });
 
@@ -326,16 +331,17 @@ const calStyles = StyleSheet.create({
 export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
   visible,
   onClose,
-  onSelectTrain,
-  onSelectStation,
   onPlanRoute,
+  initialFrom,
+  initialTo,
+  initialDate,
 }) => {
   const insets = useSafeAreaInsets();
 
   // Journey planner state
-  const [routeFrom, setRouteFrom] = useState('CSMT');
-  const [routeTo, setRouteTo] = useState('THVM');
-  const [journeyDate, setJourneyDate] = useState(() => toISODate(new Date()));
+  const [routeFrom, setRouteFrom] = useState(initialFrom || 'CSMT');
+  const [routeTo, setRouteTo] = useState(initialTo || 'THVM');
+  const [journeyDate, setJourneyDate] = useState<string | null>(initialDate !== undefined ? initialDate : () => toISODate(new Date()));
   const [showCalendar, setShowCalendar] = useState(false);
   const [stationPickTarget, setStationPickTarget] = useState<StationPickTarget>(null);
 
@@ -343,12 +349,15 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
   const [allTrains, setAllTrains] = useState<Train[]>([]);
   const [allStations, setAllStations] = useState<Station[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
+      if (initialFrom) setRouteFrom(initialFrom);
+      if (initialTo) setRouteTo(initialTo);
+      if (initialDate !== undefined) setJourneyDate(initialDate);
       trainService.getAllTrains().then(setAllTrains);
       stationService.getAllStations().then(setAllStations);
     }
-  }, [visible]);
+  }, [visible, initialFrom, initialTo, initialDate]);
 
   // Date bounds
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return toISODate(d); }, []);
@@ -357,18 +366,10 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
   }, []);
   const quickDates = useMemo(() => buildQuickDates(), []);
 
-  // Route trains filtered
-  const routeTrains = useMemo<Train[]>(() => {
-    const MUMBAI_CODES = new Set(['CSMT', 'LTT', 'DR', 'PNVL', 'BCT', 'BDTS', 'DIV']);
-    const isFromMumbai = MUMBAI_CODES.has(routeFrom);
-    return allTrains.filter(train => {
-      let fromIdx = train.stops.findIndex(s => s.stationCode === routeFrom);
-      if (fromIdx < 0 && isFromMumbai) fromIdx = train.stops.findIndex(s => MUMBAI_CODES.has(s.stationCode));
-      if (fromIdx < 0) return false;
-      const toIdx = train.stops.findIndex((s, i) => i > fromIdx && s.stationCode === routeTo);
-      return toIdx > fromIdx;
-    });
-  }, [routeFrom, routeTo, allTrains]);
+  // Filtered matching count
+  const matchingTrains = useMemo(() => {
+    return filterAndSortJourneyTrains(allTrains, routeFrom, routeTo, journeyDate || undefined);
+  }, [allTrains, routeFrom, routeTo, journeyDate]);
 
   const handleSwapRoute = useCallback(() => {
     const tmp = routeFrom;
@@ -387,7 +388,7 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
   }, [stationPickTarget]);
 
   const handleSearchTrain = useCallback(() => {
-    onPlanRoute?.(routeFrom, routeTo, journeyDate);
+    onPlanRoute?.(routeFrom, routeTo, journeyDate || undefined);
     onClose();
   }, [routeFrom, routeTo, journeyDate, onPlanRoute, onClose]);
 
@@ -416,148 +417,242 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
       >
         {/* ── Header ──────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
             <Ionicons name="arrow-back" size={24} color="#2C201A" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Plan Your Journey</Text>
-          <View style={{ width: 24 }} />
+          <Text style={styles.headerTitle}>Plan Journey</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setRouteFrom('CSMT');
+              setRouteTo('MAO');
+              setJourneyDate(toISODate(new Date()));
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.resetText}>Reset</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ── Journey Content ──────────────────────────────────────── */}
-        {
-          <ScrollView
-            style={{ flex: 1 }}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* ── Journey Card: From / To ──────────────────────────── */}
-            <View style={styles.journeyCard}>
-              {/* FROM */}
-              <TouchableOpacity
-                style={styles.stationRow}
-                onPress={() => handleOpenStationPick('from')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.dotOrigin} />
-                <View style={styles.stationInfo}>
-                  <Text style={styles.stationLabel}>FROM</Text>
-                  <Text style={styles.stationValue}>
-                    {STATION_MAP[routeFrom]?.name ?? routeFrom}
-                  </Text>
-                  <Text style={styles.stationCode}>{routeFrom}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#C4B8AF" />
-              </TouchableOpacity>
+        {/* ── Journey Input Form ──────────────────────────────────── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Journey Card: From / To ──────────────────────────── */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="location-outline" size={14} color="#8A7A70" style={{ marginRight: 6 }} />
+            <Text style={styles.sectionTitle}>SELECT ROUTE</Text>
+          </View>
 
-              {/* Divider + Swap */}
-              <View style={styles.swapRow}>
-                <View style={styles.swapLine} />
-                <TouchableOpacity style={styles.swapBtn} onPress={handleSwapRoute} activeOpacity={0.7}>
-                  <Ionicons name="swap-vertical" size={18} color="#9E3C1B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* TO */}
-              <TouchableOpacity
-                style={styles.stationRow}
-                onPress={() => handleOpenStationPick('to')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.dotDestination} />
-                <View style={styles.stationInfo}>
-                  <Text style={styles.stationLabel}>TO</Text>
-                  <Text style={styles.stationValue}>
-                    {STATION_MAP[routeTo]?.name ?? routeTo}
-                  </Text>
-                  <Text style={styles.stationCode}>{routeTo}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#C4B8AF" />
-              </TouchableOpacity>
-            </View>
-
-            {/* ── Journey Date: tap to open calendar ── */}
+          <View style={styles.journeyCard}>
+            {/* FROM */}
             <TouchableOpacity
-              style={styles.datePickerRow}
-              onPress={() => setShowCalendar(v => !v)}
-              activeOpacity={0.75}
+              style={styles.stationRow}
+              onPress={() => handleOpenStationPick('from')}
+              activeOpacity={0.7}
             >
-              <View style={styles.datePickerLeft}>
-                <Ionicons name="calendar-outline" size={20} color="#9E3C1B" style={{ marginRight: 12 }} />
-                <View>
-                  <Text style={styles.datePickerLabel}>JOURNEY DATE</Text>
-                  <Text style={styles.datePickerValue}>{formatDateLong(journeyDate)}</Text>
-                </View>
+              <View style={styles.dotOrigin} />
+              <View style={styles.stationInfo}>
+                <Text style={styles.stationLabel}>FROM (ORIGIN)</Text>
+                <Text style={styles.stationValue} numberOfLines={1}>
+                  {STATION_MAP[routeFrom]?.name ?? routeFrom}
+                </Text>
+                <Text style={styles.stationCode}>{routeFrom}</Text>
               </View>
-              <Ionicons
-                name={showCalendar ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color="#9E3C1B"
-              />
+              <View style={styles.changeBadge}>
+                <Text style={styles.changeBadgeText}>Change</Text>
+                <Ionicons name="chevron-forward" size={14} color="#9E3C1B" style={{ marginLeft: 2 }} />
+              </View>
             </TouchableOpacity>
 
-            {/* Mini Calendar (toggled) */}
-            {showCalendar && (
-              <View style={styles.calendarCard}>
-                <MiniCalendar
-                  selectedDate={journeyDate}
-                  onSelectDate={(iso) => { setJourneyDate(iso); setShowCalendar(false); }}
-                  minDate={today}
-                  maxDate={maxDate}
-                />
+            {/* Divider + Swap */}
+            <View style={styles.swapRow}>
+              <View style={styles.swapLine} />
+              <TouchableOpacity
+                style={styles.swapBtn}
+                onPress={handleSwapRoute}
+                activeOpacity={0.7}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="swap-vertical" size={18} color="#9E3C1B" />
+              </TouchableOpacity>
+              <View style={styles.swapLine} />
+            </View>
+
+            {/* TO */}
+            <TouchableOpacity
+              style={styles.stationRow}
+              onPress={() => handleOpenStationPick('to')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.dotDestination} />
+              <View style={styles.stationInfo}>
+                <Text style={styles.stationLabel}>TO (DESTINATION)</Text>
+                <Text style={styles.stationValue} numberOfLines={1}>
+                  {STATION_MAP[routeTo]?.name ?? routeTo}
+                </Text>
+                <Text style={styles.stationCode}>{routeTo}</Text>
               </View>
-            )}
+              <View style={styles.changeBadge}>
+                <Text style={styles.changeBadgeText}>Change</Text>
+                <Ionicons name="chevron-forward" size={14} color="#9E3C1B" style={{ marginLeft: 2 }} />
+              </View>
+            </TouchableOpacity>
+          </View>
 
+          {/* ── Popular Route Chips ─────────────────────────────── */}
+          <View style={styles.quickSection}>
+            <Text style={styles.quickHeading}>POPULAR CORRIDORS</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsScroll}
+            >
+              {POPULAR_ROUTES.map(item => {
+                const isActive = routeFrom === item.from && routeTo === item.to;
+                return (
+                  <TouchableOpacity
+                    key={`${item.from}-${item.to}`}
+                    style={[styles.routeChip, isActive && styles.routeChipActive]}
+                    onPress={() => {
+                      setRouteFrom(item.from);
+                      setRouteTo(item.to);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.routeChipText, isActive && styles.routeChipTextActive]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
 
+          {/* ── Journey Date Section ─────────────────────────────── */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="calendar-outline" size={14} color="#8A7A70" style={{ marginRight: 6 }} />
+            <Text style={styles.sectionTitle}>JOURNEY DATE</Text>
+          </View>
 
-            {/* ── Search Trains Button ─────────────────────────────── */}
-            <TouchableOpacity style={styles.searchBtn} onPress={handleSearchTrain} activeOpacity={0.85}>
-              <Ionicons name="train" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.searchBtnText}>
-                Find Trains ({routeTrains.length} available)
+          {/* Date Picker trigger row */}
+          <TouchableOpacity
+            style={styles.datePickerRow}
+            onPress={() => setShowCalendar(v => !v)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.datePickerLeft}>
+              <View style={styles.dateIconBox}>
+                <Ionicons name="calendar" size={18} color="#9E3C1B" />
+              </View>
+              <View>
+                <Text style={styles.datePickerLabel}>DATE OF TRAVEL</Text>
+                <Text style={styles.datePickerValue}>
+                  {journeyDate ? formatDateLong(journeyDate) : 'Any Date (All Running Days)'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.dateToggleRight}>
+              <Text style={styles.calendarToggleText}>
+                {showCalendar ? 'Hide' : 'Calendar'}
+              </Text>
+              <Ionicons
+                name={showCalendar ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#9E3C1B"
+                style={{ marginLeft: 3 }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {/* Quick Date Pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickDateScroll}
+          >
+            {/* Any Date Pill */}
+            <TouchableOpacity
+              style={[styles.quickDatePill, journeyDate === null && styles.quickDatePillActive]}
+              onPress={() => {
+                setJourneyDate(null);
+                setShowCalendar(false);
+              }}
+              activeOpacity={0.75}
+            >
+              <Text
+                style={[
+                  styles.quickDatePillText,
+                  journeyDate === null && styles.quickDatePillTextActive,
+                ]}
+              >
+                All Days
               </Text>
             </TouchableOpacity>
 
-            {/* ── Direct Trains List ───────────────────────────────── */}
-            {routeTrains.length > 0 && (
-              <View style={{ marginTop: 4 }}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="train-outline" size={15} color="#8A7A70" style={{ marginRight: 6 }} />
-                  <Text style={styles.sectionTitle}>
-                    DIRECT TRAINS · {routeFrom} → {routeTo}
+            {/* Upcoming Days */}
+            {quickDates.map(item => {
+              const isSelected = journeyDate === item.iso;
+              return (
+                <TouchableOpacity
+                  key={item.iso}
+                  style={[styles.quickDatePill, isSelected && styles.quickDatePillActive]}
+                  onPress={() => {
+                    setJourneyDate(item.iso);
+                    setShowCalendar(false);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.quickDatePillText,
+                      isSelected && styles.quickDatePillTextActive,
+                    ]}
+                  >
+                    {item.label}
                   </Text>
-                </View>
-                {routeTrains.map(t => {
-                  const color = getTrainTypeColor(t.type);
-                  return (
-                    <TouchableOpacity
-                      key={t.trainNumber}
-                      style={styles.resultRow}
-                      onPress={() => { onClose(); onSelectTrain(t); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.resultIconBox, { backgroundColor: color + '15' }]}>
-                        <Ionicons name="train" size={20} color={color} />
-                      </View>
-                      <View style={styles.resultInfo}>
-                        <View style={styles.resultTitleRow}>
-                          <Text style={styles.resultTitle}>{t.name}</Text>
-                          <View style={[styles.typeBadge, { backgroundColor: color + '15' }]}>
-                            <Text style={[styles.typeBadgeText, { color }]}>{t.type}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.resultSubtitle}>
-                          #{t.trainNumber} · stops at {routeFrom} & {routeTo}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#C4B8AF" />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-        }
+
+          {/* Mini Calendar (toggled) */}
+          {showCalendar && (
+            <View style={styles.calendarCard}>
+              <MiniCalendar
+                selectedDate={journeyDate || today}
+                onSelectDate={(iso) => {
+                  setJourneyDate(iso);
+                  setShowCalendar(false);
+                }}
+                minDate={today}
+                maxDate={maxDate}
+              />
+            </View>
+          )}
+
+          {/* ── Search Button ─────────────────────────────────────── */}
+          <TouchableOpacity
+            style={styles.searchBtn}
+            onPress={handleSearchTrain}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="train" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.searchBtnText}>
+              Find Trains ({matchingTrains.length} Available)
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.hintText}>
+            Results will apply directly to the train feed on your home screen.
+          </Text>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -566,116 +661,309 @@ export const SearchJourneyModal: React.FC<SearchJourneyModalProps> = ({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAF7F4' },
-
+  container: {
+    flex: 1,
+    backgroundColor: '#FAF7F4',
+  },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: '#EFEAE6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEAE6',
     backgroundColor: '#FFFFFF',
   },
-  closeBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#2C201A' },
-
-
-
-  // ── Journey Card ───────────────────────────────────────────────
-  journeyCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    marginHorizontal: 16, marginTop: 16, marginBottom: 6,
-    borderWidth: 1, borderColor: '#EFEAE6',
-    shadowColor: '#2C201A', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-    overflow: 'hidden',
+  closeBtn: {
+    padding: 4,
   },
-  stationRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14,
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2C201A',
   },
-  dotOrigin: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#2E7D32', marginRight: 14 },
-  dotDestination: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#C05621', marginRight: 14 },
-  stationInfo: { flex: 1 },
-  stationLabel: { fontSize: 10, fontWeight: '800', color: '#8A7A70', letterSpacing: 0.6, marginBottom: 2 },
-  stationValue: { fontSize: 16, fontWeight: '800', color: '#2C201A' },
-  stationCode: { fontSize: 11, fontWeight: '700', color: '#9E3C1B', marginTop: 1 },
-  swapRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  swapLine: { flex: 1, height: 1, backgroundColor: '#F0EAE4' },
-  swapBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#F7EFE8', alignItems: 'center', justifyContent: 'center',
-    marginHorizontal: 10,
-    borderWidth: 1, borderColor: '#E8DED6',
+  resetText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9E3C1B',
   },
 
   // ── Section headers ────────────────────────────────────────────
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, marginTop: 16, marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 18,
+    marginBottom: 8,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#8A7A70', letterSpacing: 0.8 },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8A7A70',
+    letterSpacing: 0.8,
+  },
+
+  // ── Journey Card ───────────────────────────────────────────────
+  journeyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#2C201A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  stationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  dotOrigin: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2E7D32',
+    marginRight: 14,
+  },
+  dotDestination: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#C05621',
+    marginRight: 14,
+  },
+  stationInfo: {
+    flex: 1,
+  },
+  stationLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8A7A70',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  stationValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  stationCode: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9E3C1B',
+    marginTop: 2,
+  },
+  changeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7EFE8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  changeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9E3C1B',
+  },
+  swapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  swapLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#F0EAE4',
+  },
+  swapBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F7EFE8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+  },
+
+  // ── Popular Route chips ────────────────────────────────────────
+  quickSection: {
+    marginTop: 16,
+  },
+  quickHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8A7A70',
+    letterSpacing: 0.8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  chipsScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingVertical: 2,
+  },
+  routeChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  routeChipActive: {
+    backgroundColor: '#9E3C1B',
+    borderColor: '#9E3C1B',
+  },
+  routeChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4A3E38',
+  },
+  routeChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
 
   // ── Date picker row ────────────────────────────────────────────
   datePickerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    marginHorizontal: 16, marginTop: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1, borderColor: '#EFEAE6',
-    shadowColor: '#2C201A', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    marginHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#2C201A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  datePickerLeft: { flexDirection: 'row', alignItems: 'center' },
-  datePickerLabel: { fontSize: 10, fontWeight: '800', color: '#8A7A70', letterSpacing: 0.6, marginBottom: 2 },
-  datePickerValue: { fontSize: 15, fontWeight: '700', color: '#2C201A' },
+  datePickerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dateIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F7EFE8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  datePickerLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8A7A70',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  datePickerValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2C201A',
+  },
+  dateToggleRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+  },
+  calendarToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9E3C1B',
+  },
 
+  // ── Quick Date Pills ───────────────────────────────────────────
+  quickDateScroll: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 8,
+  },
+  quickDatePill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  quickDatePillActive: {
+    backgroundColor: '#9E3C1B',
+    borderColor: '#9E3C1B',
+  },
+  quickDatePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4A3E38',
+  },
+  quickDatePillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
 
   // ── Calendar card ──────────────────────────────────────────────
   calendarCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    marginHorizontal: 16, marginTop: 12,
-    borderWidth: 1, borderColor: '#EFEAE6',
-    shadowColor: '#2C201A', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+    shadowColor: '#2C201A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
     paddingBottom: 8,
   },
 
-  // ── Route chips ────────────────────────────────────────────────
-  chipsScroll: { paddingHorizontal: 16, gap: 8, paddingVertical: 2 },
-  routeChip: {
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E8DED6',
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
-  },
-  routeChipActive: { backgroundColor: '#9E3C1B', borderColor: '#9E3C1B' },
-  routeChipText: { fontSize: 13, fontWeight: '600', color: '#4A3E38' },
-  routeChipTextActive: { color: '#FFFFFF', fontWeight: '700' },
-
   // ── Search button ──────────────────────────────────────────────
   searchBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#9E3C1B',
-    marginHorizontal: 16, marginTop: 20, marginBottom: 8,
-    paddingVertical: 15, borderRadius: 16,
-    shadowColor: '#9E3C1B', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 15,
+    borderRadius: 16,
+    shadowColor: '#9E3C1B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  searchBtnText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
-
-  // ── Train results ──────────────────────────────────────────────
-  resultRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', padding: 12,
-    borderRadius: 12, marginHorizontal: 16, marginBottom: 8,
-    borderWidth: 1, borderColor: '#EFEAE6',
+  searchBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  resultIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  resultInfo: { flex: 1 },
-  resultTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  resultTitle: { fontSize: 15, fontWeight: '700', color: '#2C201A' },
-  resultSubtitle: { fontSize: 12, color: '#7A6B63', marginTop: 2 },
-  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  typeBadgeText: { fontSize: 10, fontWeight: '700' },
-  codeBadge: { backgroundColor: '#F0E7DE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  codeBadgeText: { fontSize: 10, fontWeight: '700', color: '#8A4A1C' },
-
-
+  hintText: {
+    fontSize: 12,
+    color: '#A8998E',
+    textAlign: 'center',
+    marginHorizontal: 24,
+    marginTop: 6,
+  },
 });

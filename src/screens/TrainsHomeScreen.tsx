@@ -36,7 +36,10 @@ import {
   SORT_OPTIONS,
   filterAndSortTrains,
   getContextualSegment,
+  filterAndSortJourneyTrains,
+  getJourneySegment,
 } from '../utils/trainFilterUtils';
+import { STATION_MAP } from '../data/stations';
 
 // Re-export domain types and constants for backward compatibility
 export {
@@ -85,6 +88,13 @@ export const TrainsHomeScreen: React.FC = () => {
   );
   const [sortOption, setSortOption] = useState<SortType>('Night journeys first');
 
+  // Active Journey Search applied from SearchJourneyModal
+  const [activeJourney, setActiveJourney] = useState<{
+    fromCode: string;
+    toCode: string;
+    date?: string;
+  } | null>(null);
+
   // Modals
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
@@ -114,6 +124,7 @@ export const TrainsHomeScreen: React.FC = () => {
 
   const handleHubSelect = useCallback(
     (hubId: CorridorHubId) => {
+      setActiveJourney(null);
       setSelectedHub(hubId);
       if (hubId === 'Goa') setSelectedStationCode('ALL_GOA');
       else if (hubId === 'Mumbai') setSelectedStationCode('ALL_MUMBAI');
@@ -121,6 +132,15 @@ export const TrainsHomeScreen: React.FC = () => {
     },
     [setSelectedHub],
   );
+
+  const handlePlanRoute = useCallback((fromCode: string, toCode: string, date?: string) => {
+    setActiveJourney({ fromCode, toCode, date });
+    setSearchModalVisible(false);
+  }, []);
+
+  const handleClearJourney = useCallback(() => {
+    setActiveJourney(null);
+  }, []);
 
   // Keep station code in sync if hub was changed from another screen
   useEffect(() => {
@@ -141,25 +161,42 @@ export const TrainsHomeScreen: React.FC = () => {
   }, [activeHub, selectedStationCode]);
 
   const filteredTrains = useMemo(() => {
+    if (activeJourney) {
+      return filterAndSortJourneyTrains(
+        allTrains,
+        activeJourney.fromCode,
+        activeJourney.toCode,
+        activeJourney.date,
+        sortOption,
+      );
+    }
     return filterAndSortTrains(allTrains, {
       selectedHub,
       selectedStationCode,
       sortOption,
     });
-  }, [allTrains, selectedHub, selectedStationCode, sortOption]);
+  }, [allTrains, activeJourney, selectedHub, selectedStationCode, sortOption]);
 
   const headingTitle = useMemo(() => {
+    if (activeJourney) {
+      const fromName = STATION_MAP[activeJourney.fromCode]?.name ?? activeJourney.fromCode;
+      const toName = STATION_MAP[activeJourney.toCode]?.name ?? activeJourney.toCode;
+      return `${filteredTrains.length} Direct Trains · ${fromName} → ${toName}`;
+    }
     if (activeStationObj && !activeStationObj.code.startsWith('ALL_')) {
       return `${filteredTrains.length} Trains · ${activeStationObj.shortName}`;
     }
     return `${filteredTrains.length} Trains to ${selectedHub}`;
-  }, [selectedHub, activeStationObj, filteredTrains.length]);
+  }, [activeJourney, selectedHub, activeStationObj, filteredTrains.length]);
 
   // ── Train Card Renderer ──────────────────────────────────────────
   const renderExplorerCard = useCallback(
     (train: Train, index?: number) => {
-      const segment = getContextualSegment(train, selectedHub, selectedStationCode);
+      const segment = activeJourney
+        ? getJourneySegment(train, activeJourney.fromCode, activeJourney.toCode)
+        : getContextualSegment(train, selectedHub, selectedStationCode);
       const isNearbyAlt =
+        !activeJourney &&
         selectedHub === 'Goa' &&
         !train.stops.some(s => GOA_STATION_CODES.has(s.stationCode)) &&
         train.stops.some(s => NEARBY_GOA_STATION_CODES.has(s.stationCode));
@@ -175,7 +212,7 @@ export const TrainsHomeScreen: React.FC = () => {
         />
       );
     },
-    [selectedHub, selectedStationCode, handleTrainPress],
+    [activeJourney, selectedHub, selectedStationCode, handleTrainPress],
   );
 
   return (
@@ -222,96 +259,161 @@ export const TrainsHomeScreen: React.FC = () => {
           <View style={styles.listHeader}>
             {/* Search Bar Button */}
             <TouchableOpacity
-              style={styles.searchBar}
+              style={[styles.searchBar, activeJourney && styles.searchBarActive]}
               onPress={() => setSearchModalVisible(true)}
               activeOpacity={0.8}
             >
               <Ionicons name="search" size={18} color="#9E3C1B" style={styles.searchBarIcon} />
-              <Text style={styles.searchBarPlaceholder}>
-                Search train, station or route...
+              <Text
+                style={[
+                  styles.searchBarPlaceholder,
+                  activeJourney && styles.searchBarPlaceholderActive,
+                ]}
+                numberOfLines={1}
+              >
+                {activeJourney
+                  ? `${activeJourney.fromCode} → ${activeJourney.toCode}${
+                      activeJourney.date ? ` · ${activeJourney.date}` : ''
+                    }`
+                  : 'Search train, station or route...'}
               </Text>
               <View style={styles.searchBarShortcut}>
-                <Ionicons name="options-outline" size={14} color="#9E3C1B" />
+                <Ionicons
+                  name={activeJourney ? 'pencil' : 'options-outline'}
+                  size={14}
+                  color="#9E3C1B"
+                />
               </View>
             </TouchableOpacity>
 
-            {/* Corridor Hub Segmented Tabs */}
-            <View style={styles.hubTabsRow}>
-              {CORRIDOR_HUBS.map(hub => {
-                const isActive = selectedHub === hub.id;
-                return (
+            {/* Active Journey Route Banner */}
+            {activeJourney ? (
+              <View style={styles.activeJourneyCard}>
+                <View style={styles.activeJourneyTopRow}>
+                  <View style={styles.activeJourneyBadge}>
+                    <Ionicons name="git-commit" size={12} color="#9E3C1B" />
+                    <Text style={styles.activeJourneyBadgeText}>ROUTE RESULTS</Text>
+                  </View>
                   <TouchableOpacity
-                    key={hub.id}
-                    style={[styles.hubTab, isActive && styles.hubTabActive]}
-                    onPress={() => handleHubSelect(hub.id)}
-                    activeOpacity={0.8}
+                    style={styles.clearSearchBtn}
+                    onPress={handleClearJourney}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Ionicons
-                      name={hub.icon}
-                      size={15}
-                      color={isActive ? '#FFFFFF' : '#8A4A1C'}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      style={[
-                        styles.hubTabText,
-                        isActive && styles.hubTabTextActive,
-                      ]}
-                    >
-                      {hub.label} Trains
-                    </Text>
+                    <Ionicons name="close-circle" size={15} color="#9E3C1B" style={{ marginRight: 4 }} />
+                    <Text style={styles.clearSearchText}>Clear Search</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                </View>
 
-            {/* Station Filter Pills (Clean horizontal scroll directly on canvas) */}
-            {activeHub && activeHub.stations.length > 0 && (
-              <View style={styles.stationFilterContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.stationFilterScroll}
-                >
-                  {activeHub.stations.map(stn => {
-                    const isStnActive = selectedStationCode === stn.code;
+                <View style={styles.activeJourneyRouteDetails}>
+                  <View style={styles.activeJourneyStationItem}>
+                    <Text style={styles.activeJourneyStationCode}>{activeJourney.fromCode}</Text>
+                    <Text style={styles.activeJourneyStationName} numberOfLines={1}>
+                      {STATION_MAP[activeJourney.fromCode]?.name ?? activeJourney.fromCode}
+                    </Text>
+                  </View>
+
+                  <View style={styles.activeJourneyArrowBox}>
+                    <Ionicons name="arrow-forward" size={16} color="#9E3C1B" />
+                  </View>
+
+                  <View style={styles.activeJourneyStationItem}>
+                    <Text style={styles.activeJourneyStationCode}>{activeJourney.toCode}</Text>
+                    <Text style={styles.activeJourneyStationName} numberOfLines={1}>
+                      {STATION_MAP[activeJourney.toCode]?.name ?? activeJourney.toCode}
+                    </Text>
+                  </View>
+                </View>
+
+                {activeJourney.date && (
+                  <View style={styles.activeJourneyDateBadge}>
+                    <Ionicons name="calendar-outline" size={12} color="#7A6B63" style={{ marginRight: 5 }} />
+                    <Text style={styles.activeJourneyDateText}>
+                      Journey Date: {activeJourney.date}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <>
+                {/* Corridor Hub Segmented Tabs */}
+                <View style={styles.hubTabsRow}>
+                  {CORRIDOR_HUBS.map(hub => {
+                    const isActive = selectedHub === hub.id;
                     return (
                       <TouchableOpacity
-                        key={stn.code}
-                        style={[styles.stationChip, isStnActive && styles.stationChipActive]}
-                        onPress={() => setSelectedStationCode(stn.code)}
+                        key={hub.id}
+                        style={[styles.hubTab, isActive && styles.hubTabActive]}
+                        onPress={() => handleHubSelect(hub.id)}
                         activeOpacity={0.8}
                       >
+                        <Ionicons
+                          name={hub.icon}
+                          size={15}
+                          color={isActive ? '#FFFFFF' : '#8A4A1C'}
+                          style={{ marginRight: 6 }}
+                        />
                         <Text
                           style={[
-                            styles.stationChipText,
-                            isStnActive && styles.stationChipTextActive,
+                            styles.hubTabText,
+                            isActive && styles.hubTabTextActive,
                           ]}
                         >
-                          {stn.shortName}
+                          {hub.label} Trains
                         </Text>
-                        {stn.tag && (
-                          <View
-                            style={[
-                              styles.stationTagBadge,
-                              isStnActive && styles.stationTagBadgeActive,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.stationTagBadgeText,
-                                isStnActive && styles.stationTagBadgeTextActive,
-                              ]}
-                            >
-                              {stn.tag}
-                            </Text>
-                          </View>
-                        )}
                       </TouchableOpacity>
                     );
                   })}
-                </ScrollView>
-              </View>
+                </View>
+
+                {/* Station Filter Pills (Clean horizontal scroll directly on canvas) */}
+                {activeHub && activeHub.stations.length > 0 && (
+                  <View style={styles.stationFilterContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.stationFilterScroll}
+                    >
+                      {activeHub.stations.map(stn => {
+                        const isStnActive = selectedStationCode === stn.code;
+                        return (
+                          <TouchableOpacity
+                            key={stn.code}
+                            style={[styles.stationChip, isStnActive && styles.stationChipActive]}
+                            onPress={() => setSelectedStationCode(stn.code)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={[
+                                styles.stationChipText,
+                                isStnActive && styles.stationChipTextActive,
+                              ]}
+                            >
+                              {stn.shortName}
+                            </Text>
+                            {stn.tag && (
+                              <View
+                                style={[
+                                  styles.stationTagBadge,
+                                  isStnActive && styles.stationTagBadgeActive,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.stationTagBadgeText,
+                                    isStnActive && styles.stationTagBadgeTextActive,
+                                  ]}
+                                >
+                                  {stn.tag}
+                                </Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </>
             )}
 
             {/* Feed Header: Title & Sort Trigger */}
@@ -341,8 +443,23 @@ export const TrainsHomeScreen: React.FC = () => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="train-outline" size={44} color="#A8998E" />
-            <Text style={styles.emptyTitle}>No trains matching filters</Text>
-            <Text style={styles.emptySubtitle}>Try choosing another station or corridor</Text>
+            <Text style={styles.emptyTitle}>
+              {activeJourney ? 'No direct trains found for this route' : 'No trains matching filters'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {activeJourney
+                ? 'Try swapping origin & destination or checking other travel dates'
+                : 'Try choosing another station or corridor'}
+            </Text>
+            {activeJourney && (
+              <TouchableOpacity
+                style={styles.emptyResetBtn}
+                onPress={handleClearJourney}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.emptyResetBtnText}>Reset to all corridor trains</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -353,6 +470,10 @@ export const TrainsHomeScreen: React.FC = () => {
         onClose={() => setSearchModalVisible(false)}
         onSelectTrain={handleTrainPress}
         onSelectStation={handleSelectStation}
+        onPlanRoute={handlePlanRoute}
+        initialFrom={activeJourney?.fromCode}
+        initialTo={activeJourney?.toCode}
+        initialDate={activeJourney?.date}
       />
 
       {/* 60-Day Advance Booking Calendar Modal */}
@@ -521,6 +642,105 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  searchBarActive: {
+    borderColor: '#9E3C1B',
+    backgroundColor: '#FFF8F5',
+  },
+  searchBarPlaceholderActive: {
+    color: '#9E3C1B',
+    fontWeight: '700',
+  },
+
+  // ── Active Journey Card ──────────────────────────────────────────
+  activeJourneyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#E8DED6',
+    shadowColor: '#2C201A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  activeJourneyTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  activeJourneyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FCEFE9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  activeJourneyBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#9E3C1B',
+    letterSpacing: 0.6,
+  },
+  clearSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  clearSearchText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9E3C1B',
+  },
+  activeJourneyRouteDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF7F4',
+    padding: 10,
+    borderRadius: 12,
+  },
+  activeJourneyStationItem: {
+    flex: 1,
+  },
+  activeJourneyStationCode: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2C201A',
+  },
+  activeJourneyStationName: {
+    fontSize: 11,
+    color: '#7A6B63',
+    marginTop: 1,
+  },
+  activeJourneyArrowBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+  },
+  activeJourneyDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0EAE4',
+  },
+  activeJourneyDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7A6B63',
+  },
 
   // ── Corridor Hub Tabs ────────────────────────────────────────────
   hubTabsRow: {
@@ -655,6 +875,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8A7A70',
     marginTop: 4,
+  },
+  emptyResetBtn: {
+    marginTop: 16,
+    backgroundColor: '#9E3C1B',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  emptyResetBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   // ── Sort Modal ───────────────────────────────────────────────────
